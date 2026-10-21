@@ -1,7 +1,10 @@
 # Shared look for every demo tape. Sourced by each tape; do not run directly.
 # Each tape sets its own Set Width/Height before sourcing this file.
 Set Shell "bash"
+Set FontFamily "Hack Nerd Font Mono,JetBrains Mono,monospace"
 Set FontSize 16
+Set LineHeight 1.1
+Set LetterSpacing 0
 Set Padding 20
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 70ms

@@ -1,8 +1,8 @@
 # Main tour: launch, navigate the PR list, open a PR and its diff.
 Output docs/demo/out/tour.gif
 Output docs/demo/out/tour.mp4
-Set Width 1200
-Set Height 720
+Set Width 1500
+Set Height 860
 Source docs/demo/tapes/_settings.tape
 
 Type "lazyhub"

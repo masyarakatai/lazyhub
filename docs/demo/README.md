@@ -38,3 +38,7 @@ Outputs land in `docs/demo/out/` (GIFs, PNG screenshots, and `tour.mp4`).
 `.github/workflows/demo.yml` runs on manual dispatch and on `v*` tag pushes. It re-records, and if the
 outputs changed it force-pushes `auto/demo-refresh` and opens a PR (it never pushes to `main`).
 The repository setting "Allow GitHub Actions to create and approve pull requests" must be enabled.
+
+## Fonts
+
+Tapes use `Hack Nerd Font Mono` (falls back to JetBrains Mono, then monospace). Pane icons are overridden in the demo config with single-width characters: the default glyphs (notably the lightning bolt) have ambiguous or double width, which makes Ink and the terminal disagree on columns and shifts box borders.
