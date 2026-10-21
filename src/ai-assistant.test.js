@@ -54,4 +54,18 @@ describe('agent mutation containment', () => {
       )
     }
   )
+
+  it.each([
+    ['merge_pr', { number: '42' }, 'owner/repo', 'AI_INVALID_ID'],
+    ['close_issue', { number: -1 }, 'owner/repo', 'AI_INVALID_ID'],
+    ['cancel_run', { number: 5 }, 'owner/repo', 'AI_INVALID_ID'],
+    ['close_pr', { number: 1 }, 'owner/repo --admin', 'AI_INVALID_REPO'],
+    ['add_pr_comment', { number: 1, body: 'x'.repeat(70000) }, 'owner/repo', 'AI_INVALID_TEXT'],
+    ['add_labels', { number: 1, labels: ['bug'], type: 'discussion' }, 'owner/repo', 'AI_INVALID_RESOURCE_TYPE'],
+    ['add_labels', { number: 1, labels: 'bug' }, 'owner/repo', 'AI_INVALID_LABELS'],
+    ['review_pr', { number: 1, event: 'admin-approve' }, 'owner/repo', 'AI_INVALID_ENUM'],
+    ['delete_repo', { number: 1 }, 'owner/repo', 'AI_UNKNOWN_TOOL'],
+  ])('rejects malformed %s input with stable code %s', async (tool, input, repo, code) => {
+    await expect(executeMutatingTool(tool, input, repo)).rejects.toMatchObject({ code })
+  })
 })

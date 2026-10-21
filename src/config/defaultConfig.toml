@@ -787,7 +787,7 @@ group = "action"
 [agent]
 auto_spawn_daemon = true
 mcp_auto_register = false
-default_scope     = "full"
+default_scope     = "read-only"
 require_confirm   = false
 audit_log_path    = "~/.config/lazyhub/audit.log"
 
