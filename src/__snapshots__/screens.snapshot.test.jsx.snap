@@ -1,9 +1,9 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`major screen golden snapshots > covers all 80-column major screens > 80x24 actions 1`] = `
-" ⎇ ⎇ │ ◎ ◎ │ ⑂ ⑂ │ ▎ ⚡ Actions  │ ◈ ◈
+" ⎇ ⎇ │ ⚑ ⚑ │ ⌥ ⌥ │ ▎ ↯ Actions │ ✦ ✦
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⚡  Actions                                                                                       │
+│ ↯  Actions                                                                                       │
 │──────────────────────────────────────────────────────────────────────────────────────────────────│
 │ACTIONS                                                                                           │
 │CI completed success                                                                              │
@@ -28,9 +28,9 @@ exports[`major screen golden snapshots > covers all 80-column major screens > 80
 `;
 
 exports[`major screen golden snapshots > covers all 80-column major screens > 80x24 branches 1`] = `
-" ⎇ ⎇ │ ◎ ◎ │ ▎ ⑂ Branches │ ⚡ ⚡   │ ◈ ◈
+" ⎇ ⎇ │ ⚑ ⚑ │ ▎ ⌥ Branches │ ↯ ↯ │ ✦ ✦
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ⑂  Branches                                                                                      │
+│ ⌥  Branches                                                                                      │
 │──────────────────────────────────────────────────────────────────────────────────────────────────│
 │BRANCHES                                                                                          │
 │main protected                                                                                    │
@@ -163,9 +163,9 @@ assignee @octocat
 `;
 
 exports[`major screen golden snapshots > covers all 80-column major screens > 80x24 issue list 1`] = `
-" ⎇ ⎇ │ ▎ ◎ Issues │ ⑂ ⑂ │ ⚡ ⚡   │ ◈ ◈
+" ⎇ ⎇ │ ▎ ⚑ Issues │ ⌥ ⌥ │ ↯ ↯ │ ✦ ✦
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ◎  Issues                                                                                        │
+│ ⚑  Issues                                                                                        │
 │──────────────────────────────────────────────────────────────────────────────────────────────────│
 │ISSUE LIST                                                                                        │
 │#9 Golden snapshots  p1 testing                                                                   │
@@ -190,9 +190,9 @@ exports[`major screen golden snapshots > covers all 80-column major screens > 80
 `;
 
 exports[`major screen golden snapshots > covers all 80-column major screens > 80x24 notifications 1`] = `
-" ⎇ ⎇ │ ◎ ◎ │ ⑂ ⑂ │ ⚡ ⚡   │ ▎ ◈ Notifications
+" ⎇ ⎇ │ ⚑ ⚑ │ ⌥ ⌥ │ ↯ ↯ │ ▎ ✦ Notifications
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ◈  Notifications                                                                                 │
+│ ✦  Notifications                                                                                 │
 │──────────────────────────────────────────────────────────────────────────────────────────────────│
 │NOTIFICATIONS                                                                                     │
 │review requested                                                                                  │
@@ -244,7 +244,7 @@ labels testing ux
 `;
 
 exports[`major screen golden snapshots > covers all 80-column major screens > 80x24 pr list 1`] = `
-" ▎ ⎇ Pull Requests │ ◎ ◎ │ ⑂ ⑂ │ ⚡ ⚡   │ ◈ ◈
+" ▎ ⎇ Pull Requests │ ⚑ ⚑ │ ⌥ ⌥ │ ↯ ↯ │ ✦ ✦
 ╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⎇  Pull Requests                                                                                 │
 │──────────────────────────────────────────────────────────────────────────────────────────────────│
@@ -309,10 +309,10 @@ exports[`major screen golden snapshots > covers wide PR list and diff frames > 1
 │ owner/repo      │────────────────────────────────────────────────────────────────────────────────│
 │ ──────────────  │PR LIST                                                                         │
 │ ▎⎇ Pull Req…  1 │#42 Fix deterministic snapshots  ci:fail  review:required                       │
-│  ◎ Issues     2 │#41 Phase K daemon cache  ci:pass                                               │
-│  ⑂ Branches   3 │                                                                                │
-│  ⚡ Actions    4 │                                                                                │
-│  ◈ Notifica…  5 │                                                                                │
+│  ⚑ Issues     2 │#41 Phase K daemon cache  ci:pass                                               │
+│  ⌥ Branches   3 │                                                                                │
+│  ↯ Actions    4 │                                                                                │
+│  ✦ Notifica…  5 │                                                                                │
 │                 │                                                                                │
 │                 │                                                                                │
 │                 │                                                                                │
