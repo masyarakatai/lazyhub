@@ -9,6 +9,7 @@ import {
   listNotifications,
   listPRs,
 } from '../executor.js'
+import { isRepoSlug, isPositiveId } from '../input-validation.js'
 
 const TOOL_ALIASES = {
   lazyhub_pr_list: 'list_prs',
@@ -35,7 +36,6 @@ const MUTATING_TOOLS = new Set([
 
 const MCP_MUTATIONS_DISABLED = 'MCP mutating tools are disabled until governed authorization is available'
 
-const REPO_RE = /^([A-Za-z0-9.-]{1,253}\/)?[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/
 const MAX_QUERY_LENGTH = 2000
 const STATES = { list_prs: ['open', 'closed', 'merged', 'all'], list_issues: ['open', 'closed', 'all'] }
 // Resource each read tool operates on; a caller-declared resource_type must match.
@@ -61,10 +61,10 @@ function validateArgs(canonical, args) {
   if (args.resource_type !== undefined && args.resource_type !== expected) {
     throw fail('MCP_RESOURCE_MISMATCH', `Tool ${canonical} operates on ${expected || 'no'} resources, not ${JSON.stringify(args.resource_type)}`)
   }
-  if (args.repo !== undefined && (typeof args.repo !== 'string' || !REPO_RE.test(args.repo))) {
+  if (args.repo !== undefined && !isRepoSlug(args.repo)) {
     throw fail('MCP_INVALID_REPO', 'repo must be in owner/name form')
   }
-  if (NUMBERED_TOOLS.has(canonical) && !(Number.isSafeInteger(args.number) && args.number > 0)) {
+  if (NUMBERED_TOOLS.has(canonical) && !isPositiveId(args.number)) {
     throw fail('MCP_INVALID_NUMBER', 'number must be a positive integer')
   }
   if (args.state !== undefined && !(STATES[canonical] || []).includes(args.state)) {

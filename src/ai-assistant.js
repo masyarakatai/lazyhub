@@ -9,6 +9,7 @@
  * Direct fetch pattern (same as ai.js). No SDK dependency.
  */
 
+import { isRepoSlug, isPositiveId } from './input-validation.js'
 import {
   listPRs, getPR, getPRDiff, getPRChecks, listIssues, getIssue,
   listBranches, listRuns, getRepoInfo, listNotifications, listPRComments,
@@ -395,7 +396,6 @@ async function callReadOnlyTool(toolName, toolInput, repo) {
 // ─── Mutating tool executor (called by UI after confirmation) ─────────────────
 
 const MAX_TEXT_LENGTH = 65536
-const REPO_RE = /^([A-Za-z0-9.-]{1,253}\/)?[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/
 const REVIEW_EVENTS = ['approve', 'request-changes', 'comment']
 
 function invalid(code, message) {
@@ -414,11 +414,10 @@ function validateMutationInput(toolName, input, repo) {
   if (input === null || typeof input !== 'object' || Array.isArray(input)) {
     throw invalid('AI_INVALID_INPUT', 'Tool input must be an object')
   }
-  if (typeof repo !== 'string' || !REPO_RE.test(repo)) throw invalid('AI_INVALID_REPO', 'repo must be in owner/name form')
-  const isId = v => Number.isSafeInteger(v) && v > 0
+  if (!isRepoSlug(repo)) throw invalid('AI_INVALID_REPO', 'repo must be in owner/name form')
   if (toolName === 'rerun_run' || toolName === 'cancel_run') {
-    if (!isId(input.runId)) throw invalid('AI_INVALID_ID', 'runId must be a positive integer')
-  } else if (!isId(input.number)) {
+    if (!isPositiveId(input.runId)) throw invalid('AI_INVALID_ID', 'runId must be a positive integer')
+  } else if (!isPositiveId(input.number)) {
     throw invalid('AI_INVALID_ID', 'number must be a positive integer')
   }
   for (const field of ['body', 'message']) {
