@@ -1,0 +1,62 @@
+{
+  "data": {
+    "rateLimit": { "cost": 1, "remaining": 4990, "resetAt": "2026-10-21T13:00:00Z" },
+    "repository": {
+      "nameWithOwner": "acme/widgets",
+      "pullRequests": {
+        "pageInfo": { "hasNextPage": false, "endCursor": "c3" },
+        "nodes": [
+          {
+            "number": 101, "updatedAt": "2026-10-21T10:30:00Z", "headRefOid": "aaa111", "baseRefName": "main", "merged": false, "mergedAt": null,
+            "author": { "login": "claude", "__typename": "Bot" }, "mergedBy": null,
+            "timelineItems": { "pageInfo": { "hasNextPage": false }, "nodes": [
+              { "__typename": "HeadRefForcePushedEvent", "createdAt": "2026-10-21T10:00:00Z", "actor": { "login": "claude", "__typename": "Bot" }, "beforeCommit": { "oid": "old1" }, "afterCommit": { "oid": "aaa111" } }
+            ] },
+            "reviews": { "pageInfo": { "hasNextPage": false }, "nodes": [
+              { "id": "r1", "state": "APPROVED", "submittedAt": "2026-10-21T10:10:00Z", "author": { "login": "alice", "__typename": "User" }, "commit": { "oid": "aaa111" } },
+              { "id": "r2", "state": "COMMENTED", "submittedAt": "2026-10-21T10:11:00Z", "author": { "login": "copilot-pull-request-reviewer", "__typename": "Bot" }, "commit": { "oid": "aaa111" } }
+            ] },
+            "commits": { "pageInfo": { "hasPreviousPage": false }, "nodes": [
+              { "commit": { "oid": "aaa111", "committedDate": "2026-10-21T09:59:00Z",
+                "author": { "name": "Alice", "email": "alice@example.com", "user": { "login": "alice" } },
+                "authors": { "nodes": [
+                  { "name": "Alice", "email": "alice@example.com", "user": { "login": "alice" } },
+                  { "name": "Some Agent", "email": "agent@example.invalid", "user": null }
+                ] } } }
+            ] },
+            "headCommit": { "nodes": [ { "commit": { "oid": "aaa111", "checkSuites": { "pageInfo": { "hasNextPage": false }, "nodes": [
+              { "app": { "slug": "github-actions", "name": "GitHub Actions" }, "checkRuns": { "pageInfo": { "hasNextPage": false }, "nodes": [ { "name": "test", "conclusion": "SUCCESS", "completedAt": "2026-10-21T10:20:00Z" } ] } },
+              { "app": { "slug": "circleci-checks", "name": "CircleCI" }, "checkRuns": { "pageInfo": { "hasNextPage": false }, "nodes": [ { "name": "build", "conclusion": "FAILURE", "completedAt": "2026-10-21T10:21:00Z" } ] } }
+            ] } } } ] }
+          },
+          {
+            "number": 102, "updatedAt": "2026-10-21T09:00:00Z", "headRefOid": "bbb222", "baseRefName": "main", "merged": true, "mergedAt": "2026-10-21T09:00:00Z",
+            "author": { "login": "dependabot", "__typename": "Bot" }, "mergedBy": { "login": "alice", "__typename": "User" },
+            "timelineItems": { "pageInfo": { "hasNextPage": false }, "nodes": [] },
+            "reviews": { "pageInfo": { "hasNextPage": false }, "nodes": [
+              { "id": "r3", "state": "APPROVED", "submittedAt": "2026-10-21T08:50:00Z", "author": { "login": "mystery-bot", "__typename": "Bot" }, "commit": { "oid": "bbb222" } }
+            ] },
+            "commits": { "pageInfo": { "hasPreviousPage": false }, "nodes": [
+              { "commit": { "oid": "bbb222", "committedDate": "2026-10-21T08:00:00Z",
+                "author": { "name": "dependabot[bot]", "email": "49699333+dependabot[bot]@users.noreply.github.com", "user": null },
+                "authors": { "nodes": [] } } }
+            ] },
+            "headCommit": { "nodes": [] }
+          },
+          {
+            "number": 103, "updatedAt": "2026-10-20T09:00:00Z", "headRefOid": "ccc333", "baseRefName": "main", "merged": false, "mergedAt": null,
+            "author": { "login": "claude", "__typename": "User" }, "mergedBy": null,
+            "timelineItems": { "pageInfo": { "hasNextPage": false }, "nodes": [] },
+            "reviews": { "pageInfo": { "hasNextPage": false }, "nodes": [] },
+            "commits": { "pageInfo": { "hasPreviousPage": false }, "nodes": [
+              { "commit": { "oid": "ccc333", "committedDate": "2026-10-20T08:00:00Z",
+                "author": { "name": "claude", "email": "c@example.com", "user": { "login": "claude" } },
+                "authors": { "nodes": [] } } }
+            ] },
+            "headCommit": { "nodes": [] }
+          }
+        ]
+      }
+    }
+  }
+}
