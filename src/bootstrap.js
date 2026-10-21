@@ -328,8 +328,10 @@ async function pickRepoInteractive(repos) {
 /**
  *
  * @param renderApp
+ * @param {object} [root0]
+ * @param {string} [root0.repo] repository chosen in the first-run flow
  */
-export async function bootstrap(renderApp) {
+export async function bootstrap(renderApp, { repo: chosenRepo } = /** @type {{repo?: string}} */ ({})) {
   // Write default config on first run
   writeDefaultConfig()
 
@@ -380,7 +382,7 @@ export async function bootstrap(renderApp) {
   }
 
   // Step 3 — detect repo context
-  let repo = await detectRepo()
+  let repo = chosenRepo || await detectRepo() // chosenRepo: picked in the first-run flow
   if (!repo) {
     const repos = await listRepos()
     repo = await pickRepoInteractive(repos)

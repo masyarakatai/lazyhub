@@ -69,6 +69,17 @@ const { loadConfig } = await import('../src/config.js')
 const { startIPC } = await import('../src/ipc.js')
 const { ensureDaemon } = await import('../src/daemon/lifecycle.js')
 
+// First run: read-only watch-only onboarding, before anything is created on
+// disk (config, daemon files). Quitting exits here and leaves nothing behind.
+let onboardedRepo
+const { shouldOnboard } = await import('../src/features/onboarding/flow.js')
+if (shouldOnboard()) {
+  const { runOnboarding } = await import('../src/features/onboarding/Onboarding.jsx')
+  const onboarding = await runOnboarding()
+  if (onboarding.status !== 'completed') process.exit(0)
+  onboardedRepo = onboarding.repo
+}
+
 const cfg = loadConfig()
 installCrashHandlers()
 
@@ -80,4 +91,4 @@ if (cfg.ipc?.enabled !== false) {
   if (socketPath) process.env.LAZYHUB_SOCKET = socketPath
 }
 
-await bootstrap(renderApp)
+await bootstrap(renderApp, { repo: onboardedRepo })
