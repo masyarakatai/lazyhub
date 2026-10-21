@@ -1,6 +1,6 @@
 import React, { memo } from 'react'
 import { Box, Text } from 'ink'
-import { sanitize, shortAge, authorColor, truncateToWidth, padEndWidth, padStartWidth } from '../../utils.js'
+import { sanitize, shortAge, authorColor, truncateToWidth, formatLogin, padEndWidth, padStartWidth } from '../../utils.js'
 
 // ─── Theme adapter ────────────────────────────────────────────────────────────
 // Maps the new token scheme (src/theme/index.js) to the legacy `t.*` shape
@@ -148,10 +148,12 @@ function PRExpandedDetail({ pr, t }) {
   )
 }
 
-export const PRRow = memo(({ pr, isSelected, t, titleWidth, expanded }) => {
+// `maskTitle` blanks the title cell for rows a popover floats over: the popover
+// covers only its own width, so the title's tail would otherwise peek out beside it.
+export const PRRow = memo(({ pr, isSelected, t, titleWidth, expanded, maskTitle = false }) => {
   // Use display-width-aware helpers so CJK/emoji authors don't break borders
   const rawLogin    = String(pr.author?.login || '')
-  const authorLogin = padEndWidth(truncateToWidth(rawLogin, 11), 11)
+  const authorLogin = padEndWidth(formatLogin(rawLogin, 11), 11)
   const authorClr   = authorColor(pr.author?.login)
   const ageStr      = padStartWidth(shortAge(pr.updatedAt), 4)
   const timeColor   = ageColor(pr.updatedAt, t)
@@ -170,7 +172,7 @@ export const PRRow = memo(({ pr, isSelected, t, titleWidth, expanded }) => {
             italic={pr.isDraft}
             wrap="truncate"
           >
-            {sanitize(pr.title)}
+            {maskTitle ? ' ' : sanitize(pr.title)}
           </Text>
         </Box>
         <CIBadge pr={pr} t={t} />
@@ -263,7 +265,7 @@ function PRDetailPopoverContent({ pr, t, scheme, width }) {
       <Box paddingX={1}>
         <Text color={stateColor}>{stateLabel}</Text>
         <Text color={t.ui.dim}> · </Text>
-        <Text color={t.ui.muted}>@{truncateToWidth(author, 12)}</Text>
+        <Text color={t.ui.muted}>@{formatLogin(author, 12)}</Text>
         <Text color={t.ui.dim}> → </Text>
         <Text color={t.ui.muted}>{truncateToWidth(base, 16)}</Text>
         <Text color={t.ui.dim}> · </Text>

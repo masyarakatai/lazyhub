@@ -10,7 +10,7 @@ import { format } from 'timeago.js'
 import { useKeymapInput } from '../../config/keymap.js'
 import { useGh } from '../../hooks/useGh.js'
 import { listIssues, listLabels, listCollaborators, closeIssue, createIssue, addLabels, removeLabels, addIssueAssignees, removeIssueAssignees } from '../../executor.js'
-import { sanitize, truncateToWidth, padEndWidth } from '../../utils.js'
+import { sanitize, formatLogin, padEndWidth } from '../../utils.js'
 import { FuzzySearch } from '../../components/dialogs/FuzzySearch.jsx'
 import { MultiSelect } from '../../components/dialogs/MultiSelect.jsx'
 import { ConfirmDialog } from '../../components/dialogs/ConfirmDialog.jsx'
@@ -46,7 +46,7 @@ function IssueStateBadge({ issue, t }) {
 }
 
 const IssueRow = memo(({ issue, isSelected, t }) => {
-  const authorLogin   = padEndWidth(truncateToWidth(String(issue.author?.login || ''), 12), 12)
+  const authorLogin   = padEndWidth(formatLogin(issue.author?.login, 12), 12)
   const visibleLabels = (issue.labels || []).slice(0, 2)
   const extraLabels   = (issue.labels || []).length - 2
   const timeColor     = ageColor(issue.updatedAt, t)

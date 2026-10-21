@@ -547,6 +547,30 @@ export function truncateToWidth(str, maxWidth) {
 }
 
 /**
+ * Truncate to at most `maxWidth` display columns, ending in "…" when anything
+ * was cut.  Strings that already fit are returned unchanged.
+ * @param {string} str
+ * @param {number} maxWidth
+ * @returns {string}
+ */
+export function truncateEllipsis(str, maxWidth) {
+  if (!str || maxWidth <= 0) return ''
+  if (displayWidth(str) <= maxWidth) return str
+  return truncateToWidth(str, maxWidth - 1) + '…'
+}
+
+/**
+ * Fit a GitHub login into a column: drops the redundant "[bot]" suffix of app
+ * accounts, then truncates with an ellipsis (never mid-name without a marker).
+ * @param {string} login
+ * @param {number} maxWidth
+ * @returns {string}
+ */
+export function formatLogin(login, maxWidth) {
+  return truncateEllipsis(String(login || '').replace(/\[bot\]$/, ''), maxWidth)
+}
+
+/**
  * Pad a string on the right to exactly `targetWidth` display columns.
  * Uses spaces to fill.  Wide chars are counted correctly.
  * @param {string} str

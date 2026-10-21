@@ -2,6 +2,7 @@
 import React from 'react'
 import { Box, Text } from 'ink'
 import { useTheme } from '../theme.js'
+import { displayWidth, truncateEllipsis } from '../utils.js'
 
 const BUILTIN_LABELS = {
   prs:           'Pull Requests',
@@ -33,16 +34,23 @@ export function Sidebar({ currentPane, onSelect, height, visiblePanes, paneLabel
   const allItems = (visiblePanes || Object.keys(BUILTIN_LABELS)).map((id, idx) => ({
     pane:  id,
     icon:  icons[id] || '✦',
-    label: (labels[id] || id).slice(0, INNER - 5),
+    label: labels[id] || id,
     num:   idx + 1,
     count: paneCounts[id] || 0,
   }))
+
+  // Row = marker(1) icon(w) space(1) label … [count] gap(1) num.  The label gets
+  // whatever is left so it can never run into the count or the pane number.
+  const labelWidth = (icon, num, showCount, count) =>
+    Math.max(1, INNER - 1 - displayWidth(icon) - 1 - 1 - displayWidth(String(num))
+      - (showCount ? displayWidth(` [${count}]`) : 0))
 
   const divider = <Box paddingX={1}><Text color={t.ui.divider}>{'─'.repeat(INNER)}</Text></Box>
 
   return (
     <Box
       width={width}
+      flexShrink={0}
       flexDirection="column"
       borderStyle={borderStyle || 'round'}
       borderColor={t.ui.border}
@@ -62,12 +70,14 @@ export function Sidebar({ currentPane, onSelect, height, visiblePanes, paneLabel
         {allItems.map(({ pane, icon, label, num, count }) => {
           const active = pane === currentPane
           const countColor = pane === 'notifications' ? t.ui.selected : t.ui.dim
+          const showCount = !active && count > 0
+          const fitted = truncateEllipsis(label, labelWidth(icon, num, showCount, count))
           return (
             <Box key={pane} paddingX={1} backgroundColor={active ? t.ui.activeBg : undefined}>
               <Text color={active ? t.ui.selected : t.ui.dim} bold={active} wrap="truncate">
-                {active ? '▎' : ' '}{icon} {label.padEnd(INNER - 5).slice(0, INNER - 5)}
+                {active ? '▎' : ' '}{icon} {fitted}
               </Text>
-              {!active && count > 0 && <Text color={countColor}> [{count}]</Text>}
+              {showCount && <Text color={countColor}> [{count}]</Text>}
               <Box flexGrow={1} />
               <Text color={active ? t.ui.selected : t.ui.dim}>{num}</Text>
             </Box>

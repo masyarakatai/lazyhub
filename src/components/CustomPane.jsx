@@ -37,7 +37,7 @@ import { format } from 'timeago.js'
 import { FuzzySearch } from './dialogs/FuzzySearch.jsx'
 import { AppContext } from '../context.js'
 import { useTheme } from '../theme.js'
-import { sanitize, resolvePath } from '../utils.js'
+import { sanitize, resolvePath, formatLogin, padEndWidth } from '../utils.js'
 
 // Resolve {repo}, {owner}, {name} placeholders in a command string and return as array for execa
 function resolveCommandArgs(cmd, repo) {
@@ -70,7 +70,7 @@ const CustomPaneRow = memo(({ item, isSelected, t, stateColor }) => {
           {title}
         </Text>
       </Box>
-      {author && <Text color={t.ui.muted}> {author.slice(0, 12).padEnd(12)}</Text>}
+      {author && <Text color={t.ui.muted}> {padEndWidth(formatLogin(author, 12), 12)}</Text>}
       <Text color={t.ui.dim}> {timeStr}</Text>
     </Box>
   )

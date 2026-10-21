@@ -3,7 +3,7 @@
 import React from 'react'
 import { Box, Text } from 'ink'
 import { PRListSkeleton } from '../../components/Skeleton.jsx'
-import { Popover } from '../../ui/Popover.jsx'
+import { Popover, calcPopoverPosition } from '../../ui/Popover.jsx'
 import {
   PRDetailPopoverContentMemo,
   PRRow,
@@ -47,6 +47,22 @@ export function PRListView({
     height: 1,
   }
   const effectivePopoverWidth = Math.min(POPOVER_WIDTH, termCols - 4)
+  // Rows the popover floats over (list-relative y = 1 + row index).  Their titles
+  // are blanked so no orphan fragments show to the popover's right.
+  const popoverVisible = !!selectedPR && !dialog && !popoverDismissed
+  const popoverTop = popoverVisible
+    ? calcPopoverPosition({
+        anchor: popoverAnchor,
+        popoverWidth: effectivePopoverWidth,
+        popoverHeight: POPOVER_HEIGHT,
+        termCols,
+        termRows,
+        preferredSide: 'right',
+      }).top
+    : 0
+  const isCovered = (rowIndex) =>
+    popoverVisible && rowIndex !== popoverRowIndex &&
+    1 + rowIndex >= popoverTop && 1 + rowIndex < popoverTop + POPOVER_HEIGHT
 
   return (
     <Box flexDirection="column" flexGrow={1}>
@@ -100,6 +116,7 @@ export function PRListView({
             t={t}
             titleWidth={innerWidth ? innerWidth - PR_ROW_FIXED_COLS : undefined}
             expanded={expansionEnabled && idx === cursor}
+            maskTitle={isCovered(i)}
           />
         )
       })}
@@ -113,7 +130,7 @@ export function PRListView({
         </Box>
       )}
 
-      {selectedPR && !dialog && !popoverDismissed && (
+      {popoverVisible && (
         <Popover
           anchor={popoverAnchor}
           popoverWidth={effectivePopoverWidth}

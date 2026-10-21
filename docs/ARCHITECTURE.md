@@ -324,3 +324,17 @@ To prevent merge conflicts and "branch drift":
 **B-58 — Esc at the root of a pane quit the app**
 - Root cause: `app.back` handler fell through to `exit()` for any matching key, and Esc is bound to `app.back` alongside `q`.
 - Fix: At the root only `q` exits; Esc is a no-op there and still steps back from detail/diff/comments/conflict/settings/logs/help. Action description updated.
+
+**B-59 — Sidebar label ran into the pane number / unread count at the narrow width**
+- Symptom: `Pull Reque2`, `Notificati6` on Focus at the 18-column `standard` sidebar.
+- Root cause: (1) on Focus the wide card grid made Ink flex-shrink the sidebar below its configured 18 columns, so the fixed-width label row overflowed into the number; (2) `Sidebar.jsx` fixed the label width at `INNER - 5` with `.slice()`, ignoring the icon's display width, the optional ` [count]` suffix and the number, and cutting without an ellipsis.
+- Fix: the sidebar box is `flexShrink={0}`; label width is derived from `INNER` minus marker, `displayWidth(icon)`, separators, number and count, and the label is cut with `truncateEllipsis()` (new in `utils.js`, built on `truncateToWidth`), leaving at least one space before the number. Sibling sweep: TabStrip/StatusBar labels are not right-aligned beside a number; no other pane renders a label next to a count.
+
+**B-60 — PR-list popover left orphan title fragments beside it**
+- Symptom: `.203` / `es` visible to the right of the popover; covered rows were half-hidden.
+- Root cause: the popover is only 52 columns wide but the rows beneath it span the full list, so the part of each covered title beyond the popover's right edge stayed visible. (B-56 made the popover opaque, which exposed the problem.)
+- Fix (mockup variant A, `docs/mockups/pr-list-popover-a-masked-titles.md`): `PRListView` computes the covered rows from `calcPopoverPosition()` and passes `maskTitle` to `PRRow`, which blanks the title cell and keeps CI/author/age. Sibling sweep: the popover is only used by the PR list.
+
+**B-61 — Author logins cut mid-name (`@dev-agent[b`, `@dependabot[`)**
+- Root cause: PR/issue/custom-pane author columns used `truncateToWidth` / `.slice` with no ellipsis, and bot logins carry a 5-column `[bot]` suffix that alone consumed the column.
+- Fix: new `formatLogin()` in `utils.js` drops a trailing `[bot]` and truncates with an ellipsis; used in `PRRow`, the PR popover meta line, `IssueRow` and `CustomPane`. No separate bot marker was added (design docs define none; app account names such as `dependabot` are self-evident).

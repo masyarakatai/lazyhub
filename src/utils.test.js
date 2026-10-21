@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import React from 'react'
 import { render } from 'ink-testing-library'
 import { readFileSync } from 'fs'
-import { getMarkdownRows, TextInput, decodeHtmlEntities, sanitize, displayWidth, truncateToWidth, padEndWidth, padStartWidth } from './utils.js'
+import { getMarkdownRows, TextInput, decodeHtmlEntities, sanitize, displayWidth, truncateToWidth, truncateEllipsis, formatLogin, padEndWidth, padStartWidth } from './utils.js'
 import { ThemeProvider } from './theme.js'
 
 const mockTheme = {
@@ -185,5 +185,20 @@ describe('padEndWidth / padStartWidth', () => {
 
   it('padStartWidth pads on the left', () => {
     expect(padStartWidth('5m', 4)).toBe('  5m')
+  })
+})
+
+describe('truncateEllipsis / formatLogin', () => {
+  it('returns fitting strings unchanged and cuts others with an ellipsis within width', () => {
+    expect(truncateEllipsis('Issues', 8)).toBe('Issues')
+    const out = truncateEllipsis('Notifications', 8)
+    expect(out).toBe('Notific…')
+    expect(displayWidth(out)).toBe(8)
+  })
+
+  it('drops the [bot] suffix and ellipsizes only when still too long', () => {
+    expect(formatLogin('dev-agent[bot]', 11)).toBe('dev-agent')
+    expect(formatLogin('dependabot[bot]', 11)).toBe('dependabot')
+    expect(formatLogin('a-very-long-login-name', 11)).toBe('a-very-lon…')
   })
 })
