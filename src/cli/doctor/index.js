@@ -21,6 +21,7 @@ export async function runDoctor(argv = process.argv.slice(2), out = process.stdo
     const report = checkConfig()
     ok = ok && report.ok
     out.write(formatConfigReport(report, { json }))
+    if (!json && !coverage) out.write('\nTip: run `lazyhub doctor --coverage` to check enforcement coverage and alternate paths.\n')
   }
   if (coverage) {
     const i = argv.indexOf('--repo')

@@ -25,8 +25,11 @@ private candidate build before coordinated disclosure.
 ## Security model
 
 Read `docs/THREAT_MODEL.md` for the exact claims, exclusions, coverage states,
-and T1-T21 threat checklist. In particular, Alpha is approval-only and Lazyhub does not claim to secure a fully
-compromised same-user operating system.
+and T1-T21 threat checklist. In particular, Alpha is approval-only and Lazyhub
+does not claim to secure a fully compromised same-user operating system.
+Local-agent merge approval becomes `managed_gateway` only once Slice 2 ships the
+approval path; until then no approval path exists and doctor reports it as
+`advisory` or `ungoverned`, never `managed_gateway`.
 
 ## Checking your own coverage: `lazyhub doctor --coverage`
 
@@ -41,8 +44,9 @@ evidence and `downgrade_reasons` behind it.
 
 - In this Alpha, `github_enforced` and `managed_gateway` are **never** reported:
   the pinned lazyhub App and its ruleset verification (#245) and the local
-  gateway do not exist yet, and doctor says so in its output. Local-agent
-  approval is at best `advisory`.
+  gateway do not exist yet (Slice 2), and doctor says so in its output.
+  Local-agent approval is at best `advisory` today and becomes
+  `managed_gateway` only after Slice 2 ships.
 - Partial or rate-limited GitHub reads, stale observations, an unverified
   repository identity (host and node ID), unreadable rulesets or missing
   permissions downgrade an operation to `ungoverned`, visibly.

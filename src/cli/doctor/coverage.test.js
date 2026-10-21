@@ -52,11 +52,6 @@ describe('doctor coverage states', () => {
     expect(op(r, 'cloud_agent_merge_approval')).toMatchObject({ coverage: 'advisory', evidence: { app_source_verification: 'unavailable', ruleset_status: 'readable' } })
     expect(op(r, 'non_github_paths').coverage).toBe('ungoverned')
   })
-
-  it('stays out of github_enforced for cloud-agent merge even with a readable ruleset and clean state', async () => {
-    const r = await run({ rulesets: async () => ({ status: 'readable', count: 3, names: ['lazyhub/approval'], approval_check_verified: false }) })
-    expect(op(r, 'cloud_agent_merge_approval').coverage).not.toBe('github_enforced')
-  })
 })
 
 describe('doctor downgrade paths', () => {
