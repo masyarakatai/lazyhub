@@ -52,6 +52,14 @@ Operational notes:
 ### 🤖 AI Inline Review (`A` key)
 Don't just look at code; understand it. While in the Diff View, press `A`. Claude scans your changes, identifies potential bugs or architectural smells, and lets you post those suggestions as real GitHub comments instantly.
 
+**Provider auth.** External AI CLIs (`claude`, `codex`, `gemini`) run in an isolated sandbox that never sees your repo or your logged-in config, so authenticate them with environment variables:
+
+| CLI | Set |
+|---|---|
+| Claude Code | `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) or `ANTHROPIC_API_KEY` |
+| Codex | `CODEX_API_KEY` or `OPENAI_API_KEY` |
+| Gemini CLI | `GEMINI_API_KEY` |
+
 ### 🔭 Deep Diff Navigation
 - **`f` (File Jump):** Fuzzy search filenames within a PR to jump directly to the relevant hunk.
 - **`t` (File Tree):** Toggle a sidebar showing the directory structure of the changes.

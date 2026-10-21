@@ -3,20 +3,25 @@
  *
  * Uses the `codex` CLI for executing agent tasks.
  * Prompt is piped via stdin — never argv (diffs exceed ARG_MAX).
- * Auth is managed by the user's Codex installation (~/.codex/).
+ *
+ * Isolation (#252): runs in an empty temp cwd with a throwaway HOME/CODEX_HOME.
+ * Auth is env-API-key only (CODEX_API_KEY / OPENAI_API_KEY). The user's
+ * ~/.codex/auth.json (ChatGPT login) is deliberately NOT copied: Codex rotates
+ * single-use refresh tokens, so a refresh inside the sandbox would silently
+ * invalidate the user's real login. No key -> provider unavailable.
  *
  * Note: Codex outputs NDJSON event stream (one JSON object per line).
  * We filter for 'agent_message' events and concatenate their text.
  */
 
-import { spawnAndPipe } from './_base.js'
+import { spawnAndPipe, pickEnv } from './_base.js'
 import { AIError } from '../error.js'
 
 // ── Provider metadata ─────────────────────────────────────────────────────────
 
 export const id          = 'codex'
 export const displayName = 'Codex CLI'
-export const authSource  = '~/.codex'
+export const authSource  = 'CODEX_API_KEY or OPENAI_API_KEY'
 
 // ── Capability flags ──────────────────────────────────────────────────────────
 
@@ -24,6 +29,17 @@ export const capabilities = {
   systemPrompt:   true,
   jsonMode:       false,
   promptCaching:  false,
+}
+
+// ── Isolation / auth ──────────────────────────────────────────────────────────
+
+const AUTH_HELP = 'unavailable: set CODEX_API_KEY or OPENAI_API_KEY (a `codex login` ChatGPT session is not shared with the isolated run)'
+
+/** Minimum auth material for the isolated run, or null if no API key is set. */
+function resolveAuth() {
+  const keys = pickEnv(['CODEX_API_KEY', 'OPENAI_API_KEY'])
+  if (!Object.keys(keys).length) return null
+  return { env: keys, homeEnv: { CODEX_HOME: '.codex' } }
 }
 
 // ── Detection ─────────────────────────────────────────────────────────────────
@@ -41,6 +57,7 @@ export async function detect() {
       timeoutMs: 5_000,
     })
     const version = stdout.trim().split('\n')[0] || 'unknown'
+    if (!resolveAuth()) return { available: false, version, reason: AUTH_HELP }
     return { available: true, version }
   } catch (err) {
     if (err.isNotFound) {
@@ -70,6 +87,9 @@ export async function detect() {
  * @returns {Promise<{text: string, modelUsed: string, tokensIn: null, tokensOut: null}>}
  */
 export async function complete({ system, user, _model, timeoutMs }) {
+  const auth = resolveAuth()
+  if (!auth) throw new AIError(AUTH_HELP, { code: 'auth-required', provider: id })
+
   // Combine system + user into a single stdin payload
   const stdinPayload = system
     ? `${system}\n\n${user}`
@@ -79,6 +99,10 @@ export async function complete({ system, user, _model, timeoutMs }) {
     'exec',
     '--json',
     '--skip-git-repo-check',
+    '--ignore-user-config',     // never load $CODEX_HOME/config.toml (auth still uses CODEX_HOME)
+    '--ignore-rules',           // no execpolicy .rules files
+    '--ephemeral',              // no session files
+    '--sandbox', 'read-only',
   ]
 
   let rawOutput
@@ -88,8 +112,12 @@ export async function complete({ system, user, _model, timeoutMs }) {
       args:      argv,
       stdin:     stdinPayload,
       timeoutMs: timeoutMs || 60_000,
+      auth,
     })
   } catch (err) {
+    if (err.isIsolationFailure) {
+      throw new AIError(`Codex unavailable: ${err.message}`, { code: 'provider-unavailable', provider: id })
+    }
     if (err.isTimeout) {
       throw new AIError('Codex CLI timed out', { code: 'timeout', provider: id })
     }
@@ -102,7 +130,7 @@ export async function complete({ system, user, _model, timeoutMs }) {
     // Non-zero exit — could be auth failure or other error
     const msg = err.message || 'codex CLI failed'
     if (/not logged in|unauthenticated|login/i.test(msg)) {
-      throw new AIError('Codex not logged in — run `codex login`', { code: 'auth-required', provider: id })
+      throw new AIError(AUTH_HELP, { code: 'auth-required', provider: id })
     }
     throw new AIError(`Codex CLI error: ${msg}`, { code: 'provider-unavailable', provider: id })
   }
