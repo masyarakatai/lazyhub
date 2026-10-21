@@ -11,11 +11,16 @@
  *     (Slice 2); none exists or is consulted here.
  *   - `advisory` is assigned to an operation lazyhub completely observed on
  *     GitHub: it can be reported after the fact, not prevented.
- *   - `ungoverned` is assigned when lazyhub cannot honestly claim even advisory
- *     visibility: observation was truncated / rate limited / failed for that
- *     operation, or the path is outside what GitHub-side watching can see.
- * Coverage depends ONLY on observation completeness, never on actor
- * classification (D1/D3: classification is metadata, never authority).
+ *   - `ungoverned` is assigned when lazyhub has no reliable observation
+ *     (THREAT_MODEL "Coverage vocabulary": stale observation and partial API
+ *     results downgrade the state): observation was truncated / rate limited /
+ *     failed for that operation, the data is stale, or the path is outside what
+ *     GitHub-side watching can see.
+ * Coverage state is kept separate from the observation facts that justify it:
+ * every operation carries `observation` {complete, stale, gap_codes} and
+ * `downgrade_reasons` so consumers never infer a gap from the state alone.
+ * Coverage depends ONLY on observation quality, never on actor classification
+ * (D1/D3: classification is metadata, never authority).
  *
  * Stable output shape for consumers (#133 doctor, #70 onboarding): see
  * buildReport()'s JSDoc. Additive changes bump the minor via `schema_version`
@@ -70,7 +75,8 @@ function actorSummary(events) {
  *   schema_version: 1, mode: 'watch_only', repo: string, generated_at: string, observed_at: string,
  *   staleness: {stale: boolean, age_seconds: number, stale_after_seconds: number, newest_activity_at: string|null},
  *   observation: {complete: boolean, truncated: boolean, pages_fetched: number, pull_requests_examined: number, rate_limit: object|null, gaps: object[]},
- *   operations: {operation: string, coverage: string, reason: string, evidence: object, observation_complete: boolean,
+ *   operations: {operation: string, coverage: string, reason: string, evidence: object,
+ *                observation: {complete: boolean, stale: boolean, gap_codes: string[]}, downgrade_reasons: string[],
  *                would_have_governed: boolean, observed: {total: number, by_attribution: object}}[],
  *   pull_requests: object[], actors: object[], events: object[], notes: string[]
  * }}
@@ -79,28 +85,31 @@ export function buildReport(classified, { now = Date.now } = {}) {
   const { events, gaps } = classified
   const generated = now()
   const age = Math.max(0, Math.floor((generated - Date.parse(classified.observed_at)) / 1000))
+  const stale = age > STALE_AFTER_SECONDS
   const newest = events.map(e => e.at).filter(Boolean).sort().at(-1) || null
 
   const operations = OBSERVED_OPERATIONS.map(({ operation, event, would_have_governed }) => {
     const mine = events.filter(e => e.type === event)
-    const blockingGaps = gaps.filter(g => g.operations.includes(operation)).map(g => g.code)
+    const gap_codes = gaps.filter(g => g.operations.includes(operation)).map(g => g.code)
     const by_attribution = emptyCounts()
     mine.forEach(e => { by_attribution[e.attribution] += 1 })
-    const complete = blockingGaps.length === 0
+    const complete = gap_codes.length === 0
+    const downgrade_reasons = [...gap_codes.map(code => `observation_gap:${code}`), ...(stale ? ['stale_observation'] : [])]
+    const reliable = downgrade_reasons.length === 0
     return {
       operation,
-      coverage: complete ? 'advisory' : 'ungoverned',
-      reason: complete
+      coverage: reliable ? 'advisory' : 'ungoverned',
+      reason: reliable
         ? 'Observed on GitHub after the fact; watch-only reports it but enforces nothing (no lazyhub/approval check, no gateway).'
-        : 'Observation incomplete for this operation; no visibility is claimed for the unread portion.',
+        : 'Observation is incomplete or stale for this operation; no reliable visibility is claimed.',
       evidence: {
         source: 'github_graphql_readonly',
         enforcement: 'none',
         github_enforced_missing: GITHUB_ENFORCED_MISSING,
         managed_gateway_missing: MANAGED_GATEWAY_MISSING,
-        gap_codes: blockingGaps,
       },
-      observation_complete: complete,
+      observation: { complete, stale, gap_codes },
+      downgrade_reasons,
       would_have_governed,
       observed: { total: mine.length, by_attribution },
     }
@@ -111,8 +120,9 @@ export function buildReport(classified, { now = Date.now } = {}) {
       operation: p.operation,
       coverage: 'ungoverned',
       reason: p.reason,
-      evidence: { source: 'none', enforcement: 'none', github_enforced_missing: GITHUB_ENFORCED_MISSING, managed_gateway_missing: MANAGED_GATEWAY_MISSING, gap_codes: ['not_observable'] },
-      observation_complete: false,
+      evidence: { source: 'none', enforcement: 'none', github_enforced_missing: GITHUB_ENFORCED_MISSING, managed_gateway_missing: MANAGED_GATEWAY_MISSING },
+      observation: { complete: false, stale, gap_codes: ['not_observable'] },
+      downgrade_reasons: ['not_observable'],
       would_have_governed: false,
       observed: { total: 0, by_attribution: emptyCounts() },
     })
@@ -124,7 +134,7 @@ export function buildReport(classified, { now = Date.now } = {}) {
     repo: classified.repo,
     generated_at: new Date(generated).toISOString(),
     observed_at: classified.observed_at,
-    staleness: { stale: age > STALE_AFTER_SECONDS, age_seconds: age, stale_after_seconds: STALE_AFTER_SECONDS, newest_activity_at: newest },
+    staleness: { stale, age_seconds: age, stale_after_seconds: STALE_AFTER_SECONDS, newest_activity_at: newest },
     observation: {
       complete: gaps.length === 0,
       truncated: gaps.length > 0,

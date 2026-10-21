@@ -17,13 +17,15 @@
  */
 
 /**
- * Local registry of known App/bot identities. Matching is exact on login (with
- * any `[bot]` suffix stripped) or App slug; there is no fuzzy matching.
+ * Local registry of known App/bot identities. Matching is exact on login (GraphQL omits
+ * the REST `[bot]` suffix; it is stripped if present) or on the check suite's
+ * App slug; never on display names, substrings or e-mail. There is no fuzzy
+ * matching, and unregistered identities stay `unknown`.
  * Bot-style logins only match accounts GitHub itself types as `Bot`/`App`, so a
  * `User` registered as "claude" is not attributed (it becomes `unknown`).
  */
 const KNOWN_IDENTITIES = Object.freeze([
-  { id: 'github-copilot-agent', kind: 'agent', label: 'GitHub Copilot coding agent', logins: ['copilot-swe-agent', 'copilot'], slugs: ['copilot-swe-agent'] },
+  { id: 'github-copilot-agent', kind: 'agent', label: 'GitHub Copilot coding agent', logins: ['copilot-swe-agent'], slugs: ['copilot-swe-agent'] },
   { id: 'github-copilot-reviewer', kind: 'agent', label: 'GitHub Copilot code review', logins: ['copilot-pull-request-reviewer'], slugs: ['copilot-pull-request-reviewer'] },
   { id: 'claude-code-action', kind: 'agent', label: 'Claude (GitHub App)', logins: ['claude'], slugs: ['claude'] },
   { id: 'devin', kind: 'agent', label: 'Devin', logins: ['devin-ai-integration'], slugs: ['devin-ai-integration'] },

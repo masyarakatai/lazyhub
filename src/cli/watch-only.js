@@ -49,7 +49,8 @@ export function formatWatchOnlyReport(report) {
   for (const op of report.operations) {
     const a = op.observed.by_attribution
     const seen = op.observed.total ? ` seen=${op.observed.total} (agent ${a.agent}, automation ${a.automation}, human ${a.human}, shared ${a.shared}, unknown ${a.unknown})` : ''
-    lines.push(`  ${op.operation.padEnd(28)} ${op.coverage}${seen}`)
+    const why = op.downgrade_reasons.length ? ` [downgraded: ${op.downgrade_reasons.join(', ')}]` : ''
+    lines.push(`  ${op.operation.padEnd(28)} ${op.coverage}${why}${seen}`)
   }
   if (o.gaps.length) {
     lines.push('', 'Observation gaps:')

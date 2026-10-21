@@ -43,7 +43,7 @@ query($owner: String!, $name: String!, $limit: Int!, $after: String) {
           nodes { commit {
             oid committedDate
             author { name email user { login } }
-            authors(first: 5) { nodes { name email user { login } } }
+            authors(first: 5) { pageInfo { hasNextPage } nodes { name email user { login } } }
           } }
         }
         headCommit: commits(last: 1) {

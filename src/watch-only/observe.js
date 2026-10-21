@@ -20,6 +20,7 @@ const GAP_OPERATIONS = {
   timeline: ['force_push'],
   reviews: ['pr_review'],
   commits: ['commit_push'],
+  commit_authors: ['commit_push'],
   check_suites: ['check_run'],
   check_runs: ['check_run'],
   pull_requests: ['pr_merge', 'pr_review', 'commit_push', 'force_push', 'check_run'],
@@ -52,6 +53,7 @@ function normalizePR(pr, addGap) {
   for (const { commit } of pr.commits?.nodes || []) {
     // Author + co-authors (shared commits). The committer is deliberately
     // ignored: it is usually GitHub's web-flow and says nothing about authorship.
+    if (commit.authors?.pageInfo?.hasNextPage) addGap('commit_authors_truncated', 'commit_authors', n)
     const people = [commit.author, ...(commit.authors?.nodes || [])].filter(Boolean)
     const seen = new Set()
     const actors = []

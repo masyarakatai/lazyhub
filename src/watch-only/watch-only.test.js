@@ -35,10 +35,6 @@ describe('classification (metadata only, evidence-bearing)', () => {
     expect(reviewer.actors[0].evidence[0]).toMatchObject({ kind: 'registry_match' })
     const ci = events(report, 'check_run', e => e.detail.name === 'test')[0]
     expect(ci.actors[0]).toMatchObject({ class: 'automation', registry_id: 'github-actions', source: 'check_app' })
-  })
-
-  it('classifies a User account as human and a known agent force-push as agent', async () => {
-    const report = await run()
     expect(events(report, 'pr_review', e => e.actors[0].login === 'alice')[0].attribution).toBe('human')
     expect(events(report, 'force_push')[0]).toMatchObject({ attribution: 'agent', detail: { after: 'aaa111' } })
   })
@@ -77,7 +73,7 @@ describe('report coverage', () => {
     expect(states.has('github_enforced')).toBe(false)
     expect(states.has('managed_gateway')).toBe(false)
     for (const name of ['pr_merge', 'pr_review', 'commit_push', 'force_push', 'check_run']) {
-      expect(op(report, name)).toMatchObject({ coverage: 'advisory', observation_complete: true })
+      expect(op(report, name)).toMatchObject({ coverage: 'advisory', observation: { complete: true, stale: false, gap_codes: [] }, downgrade_reasons: [] })
     }
     expect(op(report, 'pr_merge')).toMatchObject({ would_have_governed: true, observed: { total: 1 } })
     expect(op(report, 'non_github_paths').coverage).toBe('ungoverned')
@@ -99,7 +95,8 @@ describe('report coverage', () => {
     const report = await run({ maxPages: 1 })
     expect(report.observation).toMatchObject({ complete: false, truncated: true })
     expect(report.observation.gaps.map(g => g.code)).toContain('pr_page_limit')
-    expect(op(report, 'pr_merge')).toMatchObject({ coverage: 'ungoverned', observation_complete: false })
+    expect(op(report, 'pr_merge')).toMatchObject({ coverage: 'ungoverned', observation: { complete: false } })
+    expect(op(report, 'pr_merge').downgrade_reasons).toContain('observation_gap:pr_page_limit')
     expect(execa).toHaveBeenCalledTimes(1)
   })
 
@@ -122,24 +119,38 @@ describe('report coverage', () => {
     expect(report.events.length).toBeGreaterThan(0)
   })
 
-  it('flags stale observations', async () => {
+  it('downgrades every observed operation to ungoverned when the data is stale', async () => {
     const classified = classifyObservation(await observeRepo({ repo: 'acme/widgets', now: () => NOW }))
     expect(buildReport(classified, { now: () => NOW }).staleness.stale).toBe(false)
-    expect(buildReport(classified, { now: () => NOW + 3_600_000 }).staleness).toMatchObject({ stale: true, age_seconds: 3600 })
+    const stale = buildReport(classified, { now: () => NOW + 3_600_000 })
+    expect(stale.staleness).toMatchObject({ stale: true, age_seconds: 3600 })
+    expect(op(stale, 'pr_merge')).toMatchObject({ coverage: 'ungoverned', observation: { complete: true, stale: true }, downgrade_reasons: ['stale_observation'] })
   })
 })
 
+const readOnlyViolations = ([bin, args]) => {
+  const query = args.find(a => a.startsWith('query=')) || ''
+  const bad = []
+  if (bin !== 'gh') bad.push('binary')
+  if (args.slice(0, 2).join(' ') !== 'api graphql') bad.push('not graphql')
+  if (args.some(a => ['-X', '--method', '--input'].includes(a))) bad.push('method/input flag')
+  if (!/^\s*query\b/.test(query) || /\bmutation\b/i.test(query)) bad.push('not a pure query')
+  return bad
+}
+
 describe('read-only guarantee', () => {
-  it('issues only GraphQL queries with integer -F variables, never a mutation or non-GET method', async () => {
+  it('issues only pure GraphQL queries with integer -F variables', async () => {
     await run()
     expect(execa).toHaveBeenCalled()
-    for (const [bin, args] of execa.mock.calls) {
-      expect(bin).toBe('gh')
-      expect(args.slice(0, 2)).toEqual(['api', 'graphql'])
-      expect(args).not.toContain('--method')
-      expect(args.find(a => a.startsWith('query='))).not.toMatch(/\bmutation\b/i)
-      expect(args[args.indexOf('limit=20') - 1]).toBe('-F')
+    for (const call of execa.mock.calls) {
+      expect(readOnlyViolations(call)).toEqual([])
+      expect(call[1][call[1].indexOf('limit=20') - 1]).toBe('-F')
     }
+  })
+
+  it('the read-only check itself rejects writes', () => {
+    expect(readOnlyViolations(['gh', ['api', 'graphql', '-f', 'query=mutation { mergePullRequest(input:{}) { clientMutationId } }']])).toContain('not a pure query')
+    expect(readOnlyViolations(['gh', ['api', 'repos/a/b/merges', '-X', 'POST']])).toEqual(expect.arrayContaining(['not graphql', 'method/input flag']))
   })
 })
 
