@@ -17,8 +17,9 @@
  *   - config_url uses Node `fetch` with a timeout; never curl/wget. HTTP is refused.
  */
 
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
+import { ensurePrivateDir, writePrivateFile } from '../secure-fs.js'
 import { fileURLToPath } from 'url'
 import { homedir, platform as osPlatform } from 'os'
 import { parse, TomlError } from 'smol-toml'
@@ -174,8 +175,8 @@ export async function fetchRemoteConfig(url, opts = {}) {
     }
     const parsed = parse(text) // validates TOML syntax; throws → caught below
     try {
-      mkdirSync(dirname(cachePath), { recursive: true })
-      writeFileSync(cachePath, text, 'utf8')
+      ensurePrivateDir(dirname(cachePath))
+      writePrivateFile(cachePath, text)
     } catch (err) {
       logger.warn('config: could not write remote config cache', { error: err.message })
     }

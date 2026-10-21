@@ -2,8 +2,9 @@
  * config/migrate.js — one-shot state.json → lazyhub.toml migration.
  */
 
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, unlinkSync } from 'fs'
 import { dirname, join } from 'path'
+import { ensurePrivateDir, writePrivateFile } from '../secure-fs.js'
 import { homedir } from 'os'
 import { parse } from 'smol-toml'
 import { logger } from '../utils.js'
@@ -69,8 +70,8 @@ export function migrateStateJsonToToml(opts = {}) {
   if (!isPlainObject(state)) return { migrated: false, deleted: false, reason: 'state-json-not-object' }
 
   writeConfig({ state }, { configPath })
-  mkdirSync(dirname(backupPath), { recursive: true })
-  writeFileSync(backupPath, stateText.endsWith('\n') ? stateText : `${stateText}\n`, 'utf8')
+  ensurePrivateDir(dirname(backupPath))
+  writePrivateFile(backupPath, stateText.endsWith('\n') ? stateText : `${stateText}\n`)
   unlinkSync(statePath)
   logger.info('migrated state.json into lazyhub.toml; old file kept as state.json.bak')
   return { migrated: true, deleted: true, reason: 'migrated' }

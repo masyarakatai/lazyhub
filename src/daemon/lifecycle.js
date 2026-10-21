@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, unlinkSync } from 'fs'
+import { mkdirSync } from 'fs'
 import { homedir, userInfo } from 'os'
 import { dirname, join } from 'path'
 import { connect } from 'net'
@@ -6,6 +6,7 @@ import { spawn } from 'child_process'
 import {
   PROTOCOL_VERSION, MAX_MESSAGE_BYTES, daemonSpawnEnv, isUntrustedAgentContext, readSessionToken,
 } from './protocol.js'
+import { assertPrivateDir, prepareSocketPath } from '../secure-fs.js'
 
 function expandHome(path) {
   if (!path) return path
@@ -43,19 +44,25 @@ export function daemonTokenPath(config = {}) {
 }
 
 /**
+ * Create the socket directory 0700 and verify it is a real directory owned by
+ * the current user that is not group/world accessible (throws otherwise).
  * @param {string} socketPath
  */
 export function ensureSocketDir(socketPath) {
-  if (process.platform !== 'win32') mkdirSync(dirname(socketPath), { recursive: true, mode: 0o700 })
+  if (process.platform === 'win32') return
+  const dir = dirname(socketPath)
+  mkdirSync(dir, { recursive: true, mode: 0o700 })
+  assertPrivateDir(dir)
 }
 
 /**
+ * Remove a stale socket left by a crashed daemon. Symlinks, non-sockets and
+ * entries owned by another user are squatting and throw instead of being
+ * followed or deleted.
  * @param {string} socketPath
  */
 export function removeStaleSocket(socketPath) {
-  if (process.platform !== 'win32' && existsSync(socketPath)) {
-    try { unlinkSync(socketPath) } catch { /* ignore */ }
-  }
+  prepareSocketPath(socketPath)
 }
 
 /**

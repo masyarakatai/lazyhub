@@ -2,10 +2,11 @@
  * cache.js — stale-while-revalidate disk cache for gh-backed panes.
  */
 
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, readdirSync, rmSync, statSync } from 'fs'
 import { createHash } from 'crypto'
 import { homedir } from 'os'
 import { join } from 'path'
+import { ensurePrivateDir, writePrivateFile } from './secure-fs.js'
 
 export const CACHE_DIR = process.env.LAZYHUB_CACHE_DIR || join(homedir(), '.cache', 'lazyhub', 'data')
 const MAX_BYTES = 50 * 1024 * 1024
@@ -65,8 +66,8 @@ export function listCacheEntries() {
  * @param {object} meta
  */
 export function writeCache(key, payload, meta = {}) {
-  mkdirSync(CACHE_DIR, { recursive: true })
-  writeFileSync(pathFor(key), JSON.stringify({ ts: Date.now(), payload, meta }))
+  ensurePrivateDir(CACHE_DIR)
+  writePrivateFile(pathFor(key), JSON.stringify({ ts: Date.now(), payload, meta }))
   evictCache()
 }
 

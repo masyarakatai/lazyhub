@@ -1,6 +1,7 @@
-import { appendFileSync, existsSync, mkdirSync, renameSync, statSync } from 'fs'
+import { existsSync, renameSync, statSync } from 'fs'
 import { dirname } from 'path'
 import { homedir } from 'os'
+import { appendPrivateFile, ensurePrivateDir } from '../secure-fs.js'
 
 const MAX_AUDIT_BYTES = 10 * 1024 * 1024
 
@@ -45,13 +46,13 @@ function rotateAuditLog(path) {
 export function writeAuditEntry(entry, config = {}) {
   const path = auditLogPath(config)
   try {
-    mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
+    ensurePrivateDir(dirname(path))
     rotateAuditLog(path)
-    appendFileSync(path, JSON.stringify({
+    appendPrivateFile(path, JSON.stringify({
       ts: new Date().toISOString(),
       pid: process.pid,
       ...entry,
-    }) + '\n', 'utf8')
+    }) + '\n')
   } catch {
     // Audit logging is best-effort; commands keep their original behavior.
   }

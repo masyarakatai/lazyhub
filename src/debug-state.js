@@ -1,7 +1,8 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readdirSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { join } from 'path'
 import { getGhCallHistory } from './executor.js'
+import { ensurePrivateDir, writePrivateFile } from './secure-fs.js'
 
 const CACHE_DIR = join(homedir(), '.cache', 'lazyhub')
 const FILE_PREFIX = 'debug-state-'
@@ -22,9 +23,53 @@ function safeNumber(value) {
 
 function cleanString(value) {
   return String(value)
-    .replace(/\bgh[pousr]_[A-Za-z0-9_]{20,}\b/g, '[redacted]')
+    .replace(/\b(authorization|proxy-authorization|cookie)\s*[:=]\s*[^\n]*/gi, '$1: [redacted]')
+    .replace(/\b(bearer|token|basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, '$1 [redacted]')
+    .replace(/\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{20,}\b/g, '[redacted]')
     .replace(/\b[A-Za-z0-9_-]{40,}\b/g, '[redacted]')
+    .replace(/\bhttps?:\/\/[^\s"']+/gi, '[url]')
+    .replace(/\brepos\/[^/\s]+\/[^/\s]+/g, 'repos/[repo]')
     .slice(0, 500)
+}
+
+// Keys whose values are credentials or free-form/private content; dropped entirely.
+const DROPPED_KEY = /secret|password|auth|credential|cookie|body|comment|payload|diff|content/i
+// Keys that identify a repository; the value is replaced, not copied.
+const REPO_KEY = /^(repo|repository|owner|nwo|full_?name|slug)$/i
+
+/**
+ * Reduce a recorded gh argv to its shape: command words and flag names stay;
+ * values (repo slugs, field bodies, queries, branch names, ids in paths) do not.
+ * @param {string[]} args
+ */
+function redactGhArgs(args) {
+  const out = []
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = String(args[i])
+    if (arg.startsWith('-')) {
+      const eq = arg.indexOf('=')
+      out.push(eq > 0 ? `${arg.slice(0, eq)}=[redacted]` : arg)
+      if (eq < 0 && i + 1 < args.length && !String(args[i + 1]).startsWith('-')) { out.push('[redacted]'); i += 1 }
+    } else if (i === 0) {
+      out.push(cleanString(arg).slice(0, 40))
+    } else if (args[0] === 'api' && i === 1) {
+      out.push(arg.split('?')[0].replace(/^\/?repos\/[^/]+\/[^/]+/, 'repos/[repo]').replace(/\/[^/]*\d[^/]*(?=\/|$)/g, '/[id]'))
+    } else if (i === 1 && /^[a-z-]{1,20}$/.test(arg)) {
+      out.push(arg)
+    } else {
+      out.push(/^\d+$/.test(arg) ? arg : '[redacted]')
+    }
+  }
+  return out
+}
+
+function redactGhCall(call) {
+  return {
+    args: redactGhArgs(call.args || []),
+    durationMs: call.durationMs,
+    exitCode: call.exitCode,
+    ...(call.error ? { error: '[redacted]' } : {}),
+  }
 }
 
 function cleanValue(value, depth = 0) {
@@ -37,9 +82,20 @@ function cleanValue(value, depth = 0) {
 
   const out = {}
   for (const [key, child] of Object.entries(value)) {
-    if (/secret|password|auth|credential/i.test(key)) continue
+    if (DROPPED_KEY.test(key)) continue
+    if (REPO_KEY.test(key)) { out[key] = '[redacted]'; continue }
     const safeKey = key.replace(/token/ig, 'redacted').replace(/api[_-]?key/ig, 'redacted')
     out[safeKey] = cleanValue(child, depth + 1)
+  }
+  return out
+}
+
+// Filters are user-entered and may hold anything; only short enum-like words survive.
+function cleanFilters(filters) {
+  const out = {}
+  for (const [key, value] of Object.entries(filters && typeof filters === 'object' ? filters : {})) {
+    if (typeof value === 'number' || typeof value === 'boolean') out[key] = value
+    else out[key] = typeof value === 'string' && /^[A-Za-z_-]{1,16}$/.test(value) ? value : '[redacted]'
   }
   return out
 }
@@ -69,18 +125,19 @@ export function collectDebugState(appState = {}) {
       activePane: state.activePane ?? null,
       view: state.view ?? null,
       itemNumber: state.itemNumber ?? null,
-      filters: state.filters ?? {},
+      filters: cleanFilters(state.filters),
       cursors: state.cursors ?? {},
       dialog: state.dialog ?? null,
       mode: state.mode ?? null,
     },
-    ghCalls: getGhCallHistory(),
-    recentStatus: Array.isArray(state.recentStatus) ? state.recentStatus.slice(-5) : [],
+    ghCalls: getGhCallHistory().map(redactGhCall),
+    // Toast text can embed titles, repo names or API errors; keep only the severity.
+    recentStatus: Array.isArray(state.recentStatus) ? state.recentStatus.slice(-5).map(s => ({ variant: typeof s?.variant === 'string' ? s.variant.slice(0, 16) : null })) : [],
   }
 }
 
 function ensureCacheDir() {
-  mkdirSync(CACHE_DIR, { recursive: true })
+  ensurePrivateDir(CACHE_DIR)
 }
 
 /**
@@ -106,7 +163,7 @@ export function writeDebugState(appState = {}) {
   const state = collectDebugState(appState)
   const stamp = state.generatedAt.replace(/[:.]/g, '-')
   const path = join(CACHE_DIR, `${FILE_PREFIX}${stamp}${FILE_SUFFIX}`)
-  writeFileSync(path, `${JSON.stringify(state, null, 2)}\n`, 'utf8')
+  writePrivateFile(path, `${JSON.stringify(state, null, 2)}\n`)
   return { path, state }
 }
 

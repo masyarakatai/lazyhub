@@ -8,13 +8,14 @@
 import React, { useState, useEffect } from 'react'
 import { Box, Text, useInput } from 'ink'
 /* eslint-enable no-unused-vars */
-import { appendFileSync, readFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { join, isAbsolute, dirname } from 'path'
 import { homedir } from 'os'
 import chalk from 'chalk'
 import hljs from 'highlight.js'
 import stringWidth from 'string-width'
 import { useTheme } from './theme.js'
+import { appendPrivateFile, ensurePrivateDir } from './secure-fs.js'
 
 const LOG_FILE = join(homedir(), '.config', 'lazyhub', 'debug.log')
 
@@ -72,9 +73,8 @@ function log(level, message, meta = {}) {
       ...meta,
     }
     const line = JSON.stringify(entry) + '\n'
-    const dir = dirname(LOG_FILE)
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    appendFileSync(LOG_FILE, line, 'utf8')
+    ensurePrivateDir(dirname(LOG_FILE))
+    appendPrivateFile(LOG_FILE, line)
   } catch {
     // ignore logging failures
   }
