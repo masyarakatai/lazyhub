@@ -1,0 +1,61 @@
+name: Demo recordings
+
+# Regenerates docs/demo/out with VHS and opens/updates a PR. Never pushes to main.
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions: {}
+
+concurrency:
+  group: demo-refresh
+  cancel-in-progress: false
+
+jobs:
+  record:
+    name: Record demos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      # Installs vhs plus its ttyd and ffmpeg dependencies; no tape is run here.
+      - uses: charmbracelet/vhs-action@f6d7db07a432fcd3b06772628d36a57f96d95dcf # v2.1.1
+
+      - name: Record
+        run: npm run demo
+
+      - name: Open or update refresh PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: auto/demo-refresh
+        run: |
+          if git diff --quiet -- docs/demo/out && [ -z "$(git ls-files --others --exclude-standard docs/demo/out)" ]; then
+            echo "Demo outputs unchanged; nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add docs/demo/out
+          git commit -m "chore(demo): refresh VHS recordings"
+          git push --force origin "$BRANCH"
+          if [ -z "$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number')" ]; then
+            gh pr create --base main --head "$BRANCH" \
+              --title "chore(demo): refresh VHS recordings" \
+              --body "Automated refresh of docs/demo/out via \`npm run demo\` (workflow run ${GITHUB_RUN_ID}, ref ${GITHUB_REF_NAME}). Review the GIFs before merging."
+          fi

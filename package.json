@@ -16,6 +16,7 @@
     "test:coverage": "vitest run --coverage",
     "docs:refresh": "node scripts/refresh-file-map.js",
     "test:pty": "node test/pty/run.js",
+    "demo": "node scripts/demo.mjs",
     "prepublishOnly": "npm run build && npm run typecheck && npm test"
   },
   "files": [
