@@ -188,6 +188,8 @@
 | `src/daemon/protocol.js` | Wire protocol version. Every message must carry it; mismatches fail closed. |
 | `src/daemon/server.js` | Start the K-lite daemon in the current process. @param {object} config loaded lazyhub config @param {NodeJS.ProcessEnv} [env] environment to vet; unsafe inherited variables abort startup |
 | `src/debug-state.js` | Reduce a recorded gh argv to its shape: command words and flag names stay; values (repo slugs, field bodies, queries, branch names, ids in paths) do not. @param {string[]} args |
+| `src/features/onboarding/flow.js` | logic behind the zero-configuration first run (#70). Everything here is read-only: each gh call goes through runGh() as an allowlisted read, and the report is the watch-only report (#246) plus the doctor coverage model (#133), reused verbatim so the vocabulary cannot drift. Nothing is installed, created, authenticated or written; no marker file is kept either: a first run is simply "no lazyhub.toml yet", and the normal startup that follows completion creates it. |
+| `src/features/onboarding/Onboarding.jsx` | zero-configuration watch-only first run (#70, mockup variant A: docs/mockups/onboarding-first-run-a-stepper.md). Two steps (repository, report) in one bordered panel. Read-only end to end: it uses the user's existing gh login, never logs in, installs, creates or writes anything. Quitting at any point leaves nothing behind. |
 | `src/features/tabs/filter-to-gh.js` | translate TOML pane filters to executor args. |
 | `src/features/tabs/pane.jsx` | one TOML-declared dashboard pane. |
 | `src/features/tabs/registry.js` | TOML custom tab registry. |
@@ -214,6 +216,8 @@ Test file counts by directory:
 | `src/cli/doctor/` | 4 |
 | `src/config/` | 6 |
 | `src/daemon/` | 7 |
+| `src/executor/` | 1 |
+| `src/features/onboarding/` | 1 |
 | `src/features/prs/` | 2 |
 | `src/features/tabs/` | 2 |
 | `src/hooks/` | 1 |
@@ -221,5 +225,5 @@ Test file counts by directory:
 | `src/ui/` | 2 |
 | `src/watch-only/` | 1 |
 
-**Total non-test source files:** 132
-**Total test files:** 50
+**Total non-test source files:** 134
+**Total test files:** 52

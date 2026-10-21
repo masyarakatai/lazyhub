@@ -29,18 +29,20 @@ Alpha supports solo maintainers and pilot repositories. It has two slices.
 
 ## Slice 1 - observe safely and reach pilots
 
-| Order | Issue | Exit condition |
-|---:|---|---|
-| 1 | #247 | D1-D12, T1-T21, canonical agent rules, and private disclosure path are tracked. |
-| 2 | #249 | Agent mutations are disabled and fresh/default capability is read-only. |
-| 3 | #250 | Arbitrary daemon passthrough is gone and privileged IPC is authenticated. |
-| 4 | #251 | Only typed reads are cacheable; unknown/write-shaped operations fail closed. |
-| 5 | #252 | Shipped external AI subprocesses use isolated cwd, HOME, config, and environment. |
-| 6 | #253 | Shipped local files, sockets, caches, and diagnostics are permissioned and redacted. |
-| 7 | #246 | Watch-only observes GitHub timelines, commits, reviews, and checks with zero agent configuration. |
-| 8 | #133 | Doctor reports evidence-backed coverage and ungoverned paths. |
-| 9 | #70 | First run reaches a useful watch-only report through the existing `gh` login. |
-| 10 | #248 | Pilot npm release uses trusted publishing and verifiable provenance. |
+| Order | Issue | Exit condition | Status |
+|---:|---|---|---|
+| 1 | #247 | D1-D12, T1-T21, canonical agent rules, and private disclosure path are tracked. | Tracked |
+| 2 | #249 | Agent mutations are disabled and fresh/default capability is read-only. | Done |
+| 3 | #250 | Arbitrary daemon passthrough is gone and privileged IPC is authenticated. | Done |
+| 4 | #251 | Only typed reads are cacheable; unknown/write-shaped operations fail closed. | Done |
+| 5 | #252 | Shipped external AI subprocesses use isolated cwd, HOME, config, and environment. | Done |
+| 6 | #253 | Shipped local files, sockets, caches, and diagnostics are permissioned and redacted. | Done |
+| 7 | #246 | Watch-only observes GitHub timelines, commits, reviews, and checks with zero agent configuration. | Done |
+| 8 | #133 | Doctor reports evidence-backed coverage and ungoverned paths. | Done |
+| 9 | #70 | First run reaches a useful watch-only report through the existing `gh` login. | Done |
+| 10 | #248 | Pilot npm release uses trusted publishing and verifiable provenance. | Open (pending maintainer npm trusted-publisher setup, PR #265) |
+
+Progress: items marked Done are merged; each PR lists its own residual gaps under "Not done / needs maintainer". #248 stays open until the maintainer completes npm trusted-publisher setup and PR #265 lands.
 
 ### Slice 1 exit
 
