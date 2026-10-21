@@ -1,7 +1,7 @@
 # Zero-config coverage report from GitHub-side activity.
 Output docs/demo/out/watch-only.gif
-Set Width 1200
-Set Height 720
+Set Width 1500
+Set Height 860
 Source docs/demo/tapes/_settings.tape
 
 Type "lazyhub watch-only --repo acme/rocket"

@@ -1,6 +1,6 @@
 # Enforcement coverage and alternate-path diagnostics.
 Output docs/demo/out/doctor-coverage.gif
-Set Width 1400
+Set Width 1500
 Set Height 960
 Source docs/demo/tapes/_settings.tape
 
