@@ -42,6 +42,11 @@ if (process.argv[2] === 'doctor') {
   process.exit(await runDoctor(process.argv.slice(3)))
 }
 
+if (process.argv[2] === 'watch-only') {
+  const { runWatchOnly } = await import('../src/cli/watch-only.js')
+  process.exit(await runWatchOnly(process.argv.slice(3)))
+}
+
 if (process.argv[2] === 'serve') {
   const { runServe } = await import('../src/cli/serve.js')
   process.exit(await runServe(process.argv.slice(3)))
