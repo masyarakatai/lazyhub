@@ -27,6 +27,9 @@
  * policy in docs/CONTRACT.md.
  */
 
+/** The four coverage states (THREAT_MODEL "Coverage vocabulary"); consumers must not invent others. */
+export const COVERAGE_STATES = Object.freeze(['github_enforced', 'managed_gateway', 'advisory', 'ungoverned'])
+
 const REPORT_SCHEMA_VERSION = 1
 const STALE_AFTER_SECONDS = 10 * 60
 
