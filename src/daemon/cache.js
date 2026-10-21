@@ -1,3 +1,4 @@
+import { isCacheableOp } from './protocol.js'
 import { cacheKey, readCache, writeCache, invalidateRepoCache } from '../cache.js'
 
 /**
@@ -48,6 +49,7 @@ export class DaemonCache {
    * @param {object} meta
    */
   set(key, payload, meta = {}) {
+    if (!isCacheableOp(meta.op)) throw new Error('refusing to cache a non-allowlisted operation')
     this.memory.set(key, { ts: Date.now(), payload })
     writeCache(key, payload, meta)
   }

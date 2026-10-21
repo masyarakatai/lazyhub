@@ -10,7 +10,7 @@ export async function listNotifications(filter = {}) {
     '--jq', '[.[] | {id: .id, unread: .unread, reason: .reason, subject: {title: .subject.title, type: .subject.type, url: .subject.url}, repository: {fullName: .repository.full_name, name: .repository.name}, updatedAt: .updated_at}]',
   ]
   if (filter.all) {
-    args.push('-f', 'all=true')
+    args.push('--method', 'GET', '-f', 'all=true')
   }
   return runGh(args)
 }

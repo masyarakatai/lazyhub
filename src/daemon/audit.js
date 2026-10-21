@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 import { existsSync, renameSync, statSync } from 'fs'
 import { dirname } from 'path'
 import { homedir } from 'os'
@@ -38,38 +39,28 @@ function rotateAuditLog(path) {
 }
 
 /**
- * Write one NDJSON audit entry for a state-changing operation.
+ * Write one NDJSON audit entry for a state-changing operation. Throws when the
+ * entry cannot be durably written: callers must treat that as a block (D8/D11).
  *
  * @param {object} entry
  * @param {object} config
  */
 export function writeAuditEntry(entry, config = {}) {
   const path = auditLogPath(config)
-  try {
-    ensurePrivateDir(dirname(path))
-    rotateAuditLog(path)
-    appendPrivateFile(path, JSON.stringify({
-      ts: new Date().toISOString(),
-      pid: process.pid,
-      ...entry,
-    }) + '\n')
-  } catch {
-    // Audit logging is best-effort; commands keep their original behavior.
-  }
+  ensurePrivateDir(dirname(path))
+  rotateAuditLog(path)
+  appendPrivateFile(path, JSON.stringify({
+    ts: new Date().toISOString(),
+    pid: process.pid,
+    ...entry,
+  }) + '\n')
 }
 
 /**
- * Return true when gh args represent a state-changing operation.
+ * Stable digest of a gh argv, so audit entries never carry payloads.
  *
  * @param {string[]} args
  */
-export function isGhMutation(args = []) {
-  if (args.includes('--method')) {
-    const method = args[args.indexOf('--method') + 1]
-    if (method && method !== 'GET') return true
-  }
-  const [group, cmd] = args
-  return [
-    'merge', 'close', 'ready', 'review', 'comment', 'create', 'edit',
-  ].includes(cmd) || (group === 'gist' && cmd === 'delete') || (group === 'run' && ['rerun', 'cancel'].includes(cmd))
+export function hashArgs(args = []) {
+  return createHash('sha256').update(JSON.stringify(args)).digest('hex').slice(0, 16)
 }
