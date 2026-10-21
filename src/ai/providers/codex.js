@@ -5,24 +5,23 @@
  * Prompt is piped via stdin — never argv (diffs exceed ARG_MAX).
  *
  * Isolation (#252): runs in an empty temp cwd with a throwaway HOME/CODEX_HOME.
- * Auth handoff is the minimum available: CODEX_API_KEY / OPENAI_API_KEY env if
- * set, else ONLY ~/.codex/auth.json (or $CODEX_HOME/auth.json) is copied (0600)
- * into the isolated CODEX_HOME. config.toml, rules, hooks, MCP, AGENTS.md and
- * history are never exposed. No credential -> provider unavailable.
+ * Auth is env-API-key only (CODEX_API_KEY / OPENAI_API_KEY). The user's
+ * ~/.codex/auth.json (ChatGPT login) is deliberately NOT copied: Codex rotates
+ * single-use refresh tokens, so a refresh inside the sandbox would silently
+ * invalidate the user's real login. No key -> provider unavailable.
  *
  * Note: Codex outputs NDJSON event stream (one JSON object per line).
  * We filter for 'agent_message' events and concatenate their text.
  */
 
-import { spawnAndPipe, pickEnv, realHome, credentialFileExists } from './_base.js'
-import { isAbsolute, join, relative } from 'node:path'
+import { spawnAndPipe, pickEnv } from './_base.js'
 import { AIError } from '../error.js'
 
 // ── Provider metadata ─────────────────────────────────────────────────────────
 
 export const id          = 'codex'
 export const displayName = 'Codex CLI'
-export const authSource  = '~/.codex/auth.json or CODEX_API_KEY'
+export const authSource  = 'CODEX_API_KEY or OPENAI_API_KEY'
 
 // ── Capability flags ──────────────────────────────────────────────────────────
 
@@ -34,28 +33,13 @@ export const capabilities = {
 
 // ── Isolation / auth ──────────────────────────────────────────────────────────
 
-const AUTH_HELP = 'run `codex login` (or set CODEX_API_KEY) to use Codex'
+const AUTH_HELP = 'unavailable: set CODEX_API_KEY or OPENAI_API_KEY (a `codex login` ChatGPT session is not shared with the isolated run)'
 
-/** Path of auth.json relative to the real HOME, or null if CODEX_HOME is outside HOME. */
-function authFileRel() {
-  const ch = process.env.CODEX_HOME
-  if (!ch) return join('.codex', 'auth.json')
-  const rel = relative(realHome(), join(ch, 'auth.json'))
-  return rel.startsWith('..') || isAbsolute(rel) ? null : rel
-}
-
-/** Minimum auth material for the isolated run, or null if none is available. */
+/** Minimum auth material for the isolated run, or null if no API key is set. */
 function resolveAuth() {
   const keys = pickEnv(['CODEX_API_KEY', 'OPENAI_API_KEY'])
-  if (Object.keys(keys).length) return { env: keys, homeEnv: { CODEX_HOME: '.codex' } }
-  const rel = authFileRel()
-  if (rel && credentialFileExists(rel)) {
-    return {
-      files:   [{ src: join(realHome(), rel), dest: join('.codex', 'auth.json') }],
-      homeEnv: { CODEX_HOME: '.codex' },
-    }
-  }
-  return null
+  if (!Object.keys(keys).length) return null
+  return { env: keys, homeEnv: { CODEX_HOME: '.codex' } }
 }
 
 // ── Detection ─────────────────────────────────────────────────────────────────
@@ -146,7 +130,7 @@ export async function complete({ system, user, _model, timeoutMs }) {
     // Non-zero exit — could be auth failure or other error
     const msg = err.message || 'codex CLI failed'
     if (/not logged in|unauthenticated|login/i.test(msg)) {
-      throw new AIError('Codex not logged in — run `codex login`', { code: 'auth-required', provider: id })
+      throw new AIError(AUTH_HELP, { code: 'auth-required', provider: id })
     }
     throw new AIError(`Codex CLI error: ${msg}`, { code: 'provider-unavailable', provider: id })
   }

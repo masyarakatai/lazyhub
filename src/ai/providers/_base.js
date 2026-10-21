@@ -5,19 +5,16 @@
  *  - execFile only — no exec, no shell interpretation
  *  - Prompt piped via stdin — never as argv (diffs exceed ARG_MAX; injection risk)
  *  - Isolation — empty 0700 temp cwd + throwaway HOME; minimal env plus the
- *    provider's explicit auth material only (no repo, no user agent settings)
+ *    provider's explicit env-var auth only (no repo, no user agent settings)
  *  - Cleanup of the sandbox on success, error, timeout and parent termination
  *  - 60s hard timeout + SIGTERM → SIGKILL after 5s grace
  *  - 256KB output cap — larger responses truncated and treated as malformed
  */
 
 import { execFile as _execFile } from 'node:child_process'
-import {
-  chmodSync, closeSync, constants as fsConstants, lstatSync, mkdirSync,
-  mkdtempSync, openSync, readFileSync, rmSync, writeFileSync,
-} from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, normalize, sep } from 'node:path'
+import { chmodSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, normalize, sep } from 'node:path'
 
 // Note: We deliberately do NOT import from execa here — execFile is sufficient
 // and avoids adding a dependency. The project's .eslintrc overrides allow execFile
@@ -35,11 +32,6 @@ const _activeDirs     = new Set()
 const _activeChildren = new Set()
 let   _hooksInstalled = false
 
-/** Real (non-isolated) home of the invoking user — only used to locate credential files. */
-export function realHome() {
-  return process.env.HOME || homedir()
-}
-
 /**
  * Collect the named env vars from the parent environment (non-empty only).
  * @param {string[]} names
@@ -50,18 +42,6 @@ export function pickEnv(names) {
   const out = {}
   for (const n of names) if (process.env[n]) out[n] = process.env[n]
   return out
-}
-
-/**
- * True if `relPath` (relative to the real HOME) is a regular, non-symlink file.
- * @param {string} relPath
- */
-export function credentialFileExists(relPath) {
-  try {
-    return lstatSync(join(realHome(), relPath)).isFile()
-  } catch {
-    return false
-  }
 }
 
 function isolationError(message, cause) {
@@ -93,21 +73,10 @@ function installExitHooks() {
   }
 }
 
-function copyCredential(src, destAbs) {
-  // lstat + O_NOFOLLOW: refuse symlinks so a planted link can't smuggle other files in.
-  if (!lstatSync(src).isFile()) throw new Error('credential source is not a regular file')
-  const fd = openSync(src, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW || 0))
-  let data
-  try { data = readFileSync(fd) } finally { closeSync(fd) }
-  mkdirSync(dirname(destAbs), { recursive: true, mode: 0o700 })
-  writeFileSync(destAbs, data, { mode: 0o600 })
-  chmodSync(destAbs, 0o600)
-}
-
 /**
  * Build the sandbox: <root>/{work,home,tmp}, all 0700. Throws an
  * `isIsolationFailure` error (after removing anything created) on any failure.
- * @param {{env?:Record<string,string>, files?:{src:string,dest:string}[], homeEnv?:Record<string,string>}} auth
+ * @param {{env?:Record<string,string>, homeEnv?:Record<string,string>}} auth
  */
 function createIsolation(auth) {
   let root
@@ -119,14 +88,6 @@ function createIsolation(auth) {
     const home = join(root, 'home')
     const tmp  = join(root, 'tmp')
     for (const d of [work, home, tmp]) mkdirSync(d, { mode: 0o700 })
-
-    for (const f of auth.files || []) {
-      const rel = normalize(f.dest)
-      if (isAbsolute(rel) || rel === '..' || rel.startsWith('..' + sep)) {
-        throw new Error('credential destination escapes isolated HOME')
-      }
-      copyCredential(f.src, join(home, rel))
-    }
 
     const env = { ...(auth.env || {}), ...pickEnv(BASE_ENV_ALLOW) }
     for (const [name, rel] of Object.entries(auth.homeEnv || {})) {
@@ -166,7 +127,6 @@ function createIsolation(auth) {
  * @param {number}   [opts.timeoutMs] - Timeout in ms (default: 60000)
  * @param {object}   [opts.auth]     - Explicit auth handoff (everything else is withheld)
  * @param {Record<string,string>} [opts.auth.env]     - Env vars to pass through
- * @param {{src:string,dest:string}[]} [opts.auth.files] - Credential files copied (0600) to <isolated HOME>/<dest>
  * @param {Record<string,string>} [opts.auth.homeEnv] - Env var → path relative to isolated HOME
  * @returns {Promise<string>} stdout (up to OUTPUT_CAP_BYTES)
  */

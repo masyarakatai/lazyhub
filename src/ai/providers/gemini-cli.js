@@ -5,22 +5,20 @@
  * Prompt is piped via stdin — never argv (diffs exceed ARG_MAX).
  *
  * Isolation (#252): runs in an empty temp cwd with GEMINI_CLI_HOME and HOME
- * pointing at a throwaway dir. Auth handoff is the minimum available:
- * GEMINI_API_KEY env if set, else ONLY ~/.gemini/oauth_creds.json is copied
- * (0600) and GOOGLE_GENAI_USE_GCA=true selects Google-login auth. settings.json,
- * extensions, MCP config, GEMINI.md and history are never exposed. No
- * credential -> provider unavailable.
+ * pointing at a throwaway dir. Auth is env-API-key only (GEMINI_API_KEY). The
+ * user's ~/.gemini/oauth_creds.json is deliberately NOT copied: a token refresh
+ * inside the sandbox could invalidate the real login and we cannot prove it
+ * doesn't. No key -> provider unavailable.
  */
 
-import { spawnAndPipe, pickEnv, realHome, credentialFileExists } from './_base.js'
-import { join } from 'node:path'
+import { spawnAndPipe, pickEnv } from './_base.js'
 import { AIError } from '../error.js'
 
 // ── Provider metadata ─────────────────────────────────────────────────────────
 
 export const id          = 'gemini-cli'
 export const displayName = 'Gemini CLI'
-export const authSource  = '~/.gemini/oauth_creds.json or GEMINI_API_KEY'
+export const authSource  = 'GEMINI_API_KEY'
 
 // ── Capability flags ──────────────────────────────────────────────────────────
 
@@ -32,21 +30,13 @@ export const capabilities = {
 
 // ── Isolation / auth ──────────────────────────────────────────────────────────
 
-const AUTH_HELP = 'sign in with `gemini` (Google login) or set GEMINI_API_KEY to use Gemini CLI'
-const OAUTH_REL = join('.gemini', 'oauth_creds.json')
+const AUTH_HELP = 'unavailable: set GEMINI_API_KEY (a Google login session is not shared with the isolated run)'
 
-/** Minimum auth material for the isolated run, or null if none is available. */
+/** Minimum auth material for the isolated run, or null if no API key is set. */
 function resolveAuth() {
   const key = pickEnv(['GEMINI_API_KEY'])
-  if (key.GEMINI_API_KEY) return { env: key, homeEnv: { GEMINI_CLI_HOME: '.' } }
-  if (credentialFileExists(OAUTH_REL)) {
-    return {
-      env:     { GOOGLE_GENAI_USE_GCA: 'true' },
-      files:   [{ src: join(realHome(), OAUTH_REL), dest: OAUTH_REL }],
-      homeEnv: { GEMINI_CLI_HOME: '.' },
-    }
-  }
-  return null
+  if (!key.GEMINI_API_KEY) return null
+  return { env: key, homeEnv: { GEMINI_CLI_HOME: '.' } }
 }
 
 // ── Detection ─────────────────────────────────────────────────────────────────
@@ -137,7 +127,7 @@ export async function complete({ system, user, _model, timeoutMs }) {
     // Non-zero exit — could be auth failure or other error
     const msg = err.message || 'gemini CLI failed'
     if (/not logged in|unauthenticated|login/i.test(msg)) {
-      throw new AIError('Gemini CLI not logged in — run `gemini auth`', { code: 'auth-required', provider: id })
+      throw new AIError(AUTH_HELP, { code: 'auth-required', provider: id })
     }
     throw new AIError(`Gemini CLI error: ${msg}`, { code: 'provider-unavailable', provider: id })
   }

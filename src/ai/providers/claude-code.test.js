@@ -249,6 +249,14 @@ describe('complete()', () => {
     expect(err.code).toBe('auth-required')
   })
 
+  it('maps a non-auth is_error:true result (exit 0) to provider-unavailable, not success', async () => {
+    makeChild({ stdout: JSON.stringify({ type: 'result', is_error: true, api_error_status: 500, result: 'Overloaded' }) })
+
+    const err = await complete({ system: 'sys', user: 'usr' }).catch(e => e)
+    expect(err).toBeInstanceOf(AIError)
+    expect(err.code).toBe('provider-unavailable')
+  })
+
   it('enforces a timeout option', async () => {
     makeChild({
       stdout: JSON.stringify({ type: 'result', result: '{"summary":"ok","suggestions":[]}' }),
@@ -369,12 +377,21 @@ describe('isolation', () => {
 
     const status = await detect()
     expect(status.available).toBe(false)
-    expect(status.reason).toMatch(/CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_API_KEY/)
+    expect(status.reason).toMatch(/claude setup-token.*CLAUDE_CODE_OAUTH_TOKEN.*ANTHROPIC_API_KEY/)
 
     childProcess.execFile.mockClear()
     const err = await complete({ system: 'sys', user: 'usr' }).catch(e => e)
     expect(err.code).toBe('auth-required')
     expect(childProcess.execFile).not.toHaveBeenCalled()
+  })
+
+  it('registers process exit/signal hooks once, not per call', async () => {
+    const count = () => ['exit', 'SIGINT', 'SIGTERM', 'SIGHUP'].map(e => process.listenerCount(e))
+    makeChild({ stdout: OK_OUT })
+    await complete({ system: 'sys', user: 'usr' })
+    const after1 = count()
+    for (let i = 0; i < 12; i++) await complete({ system: 'sys', user: 'usr' })
+    expect(count()).toEqual(after1)
   })
 
   it('is unavailable (no spawn) when the sandbox cannot be created', async () => {

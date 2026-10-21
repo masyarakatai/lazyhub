@@ -33,7 +33,7 @@ export const capabilities = {
 
 // ── Isolation / auth ──────────────────────────────────────────────────────────
 
-const AUTH_HELP = 'set CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token`) or ANTHROPIC_API_KEY to use Claude Code (isolated mode)'
+const AUTH_HELP = 'unavailable: run `claude setup-token` and export CLAUDE_CODE_OAUTH_TOKEN, or set ANTHROPIC_API_KEY (a `claude login` session is not shared with the isolated run)'
 
 /** Minimum auth material for the isolated run, or null if none is configured. */
 function resolveAuth() {
@@ -142,7 +142,7 @@ export async function complete({ system, user, model, timeoutMs }) {
     // Non-zero exit — could be auth failure or other error
     const msg = err.message || 'claude CLI failed'
     if (/not logged in|unauthenticated|login/i.test(msg)) {
-      throw new AIError('Claude Code not logged in — run `claude login`', { code: 'auth-required', provider: id })
+      throw new AIError(AUTH_HELP, { code: 'auth-required', provider: id })
     }
     throw new AIError(`Claude Code CLI error: ${msg}`, { code: 'provider-unavailable', provider: id })
   }

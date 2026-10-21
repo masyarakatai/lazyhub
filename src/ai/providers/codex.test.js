@@ -50,14 +50,15 @@ const SAVED = {}
 const TOUCHED = ['HOME', 'TMPDIR', 'GH_TOKEN', 'HTTPS_PROXY', 'NODE_OPTIONS', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY',
   'GEMINI_API_KEY', 'CODEX_API_KEY', 'CODEX_HOME', 'CLAUDE_CODE_OAUTH_TOKEN']
 
-// Real HOME must never matter: tests run against a fake HOME holding a fake login
-// plus decoy config the sandbox must not receive.
+// Real HOME must never matter: tests run against a fake HOME holding a real-looking
+// login plus decoy config the sandbox must never receive.
 beforeEach(() => {
   for (const k of TOUCHED) SAVED[k] = process.env[k]
   for (const k of TOUCHED) delete process.env[k]
   fakeHome = fs.mkdtempSync(join(tmpdir(), 'lh-test-home-'))
   fs.mkdirSync(join(fakeHome, '.codex'))
-  fs.writeFileSync(join(fakeHome, '.codex', 'auth.json'), '{"fixture":"login"}', { mode: 0o644 })
+  fs.writeFileSync(join(fakeHome, '.codex', 'auth.json'), '{"fixture":"login"}', { mode: 0o644 })  // must never be copied
+  process.env.CODEX_API_KEY = 'codex-key-fixture'
   fs.writeFileSync(join(fakeHome, '.codex', 'config.toml'), '[mcp_servers.decoy]\n')
   fs.writeFileSync(join(fakeHome, '.codex', 'AGENTS.md'), 'decoy')
   process.env.HOME = fakeHome
@@ -246,7 +247,7 @@ describe('complete()', () => {
     const err = await complete({ system: 'sys', user: 'usr' }).catch(e => e)
     expect(err).toBeInstanceOf(AIError)
     expect(err.code).toBe('auth-required')
-    expect(err.message).toContain('Codex not logged in')
+    expect(err.message).toContain('CODEX_API_KEY')
   })
 
   it('throws AIError malformed-response when no agent_message events found', async () => {
@@ -294,7 +295,7 @@ describe('complete()', () => {
 const OK_OUT = JSON.stringify({ type: 'agent_message', message: 'response' })
 
 describe('isolation', () => {
-  it('runs in an empty 0700 cwd; only auth.json (0600) reaches the isolated CODEX_HOME', async () => {
+  it('runs in an empty 0700 cwd with an empty isolated HOME; no file from the real HOME is copied', async () => {
     makeChild({ stdout: OK_OUT })
     await complete({ system: 'sys', user: 'usr' })
 
@@ -302,8 +303,8 @@ describe('isolation', () => {
     expect(snap.cwdMode).toBe('700')
     expect(snap.cwdEntries).toEqual([])
     expect(snap.homeMode).toBe('700')
-    expect(snap.homeFiles).toEqual([join('.codex', 'auth.json')])  // no config.toml / AGENTS.md
-    expect(snap.files[join('.codex', 'auth.json')]).toEqual({ mode: '600', data: '{"fixture":"login"}' })
+    expect(snap.homeFiles).toEqual([])  // no auth.json (token-rotation risk), config.toml, AGENTS.md
+    expect(snap.env.CODEX_API_KEY).toBe('codex-key-fixture')
     expect(snap.env.CODEX_HOME).toBe(join(snap.home, '.codex'))
     expect(snap.env.HOME).toBe(snap.home)
   })
@@ -317,7 +318,7 @@ describe('isolation', () => {
     await complete({ system: 'sys', user: 'usr' })
 
     const names = Object.keys(snap.env)
-    for (const n of ['GH_TOKEN', 'HTTPS_PROXY', 'NODE_OPTIONS', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'CODEX_API_KEY']) {
+    for (const n of ['GH_TOKEN', 'HTTPS_PROXY', 'NODE_OPTIONS', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY']) {
       expect(names).not.toContain(n)
     }
     const [, args] = childProcess.execFile.mock.calls[0]
@@ -325,25 +326,16 @@ describe('isolation', () => {
     expect(args.join(' ')).not.toContain('login')
   })
 
-  it('prefers CODEX_API_KEY over copying auth.json', async () => {
-    process.env.CODEX_API_KEY = 'codex-key-fixture'
+  it('does not use a CODEX_HOME auth.json either; OPENAI_API_KEY alone is enough', async () => {
+    delete process.env.CODEX_API_KEY
+    process.env.OPENAI_API_KEY = 'openai-key-fixture'
+    process.env.CODEX_HOME = join(fakeHome, '.codex')
     makeChild({ stdout: OK_OUT })
     await complete({ system: 'sys', user: 'usr' })
 
-    expect(snap.env.CODEX_API_KEY).toBe('codex-key-fixture')
+    expect(snap.env.OPENAI_API_KEY).toBe('openai-key-fixture')
+    expect(snap.env.CODEX_HOME).toBe(join(snap.home, '.codex'))
     expect(snap.homeFiles).toEqual([])
-  })
-
-  it('honours CODEX_HOME inside HOME and still copies only auth.json', async () => {
-    fs.mkdirSync(join(fakeHome, 'alt'))
-    fs.writeFileSync(join(fakeHome, 'alt', 'auth.json'), '{"alt":1}')
-    fs.writeFileSync(join(fakeHome, 'alt', 'config.toml'), 'decoy')
-    process.env.CODEX_HOME = join(fakeHome, 'alt')
-    makeChild({ stdout: OK_OUT })
-    await complete({ system: 'sys', user: 'usr' })
-
-    expect(snap.homeFiles).toEqual([join('.codex', 'auth.json')])
-    expect(snap.files[join('.codex', 'auth.json')].data).toBe('{"alt":1}')
   })
 
   const outcomes = {
@@ -364,35 +356,25 @@ describe('isolation', () => {
     }),
   }
   for (const [name, arrange] of Object.entries(outcomes)) {
-    it(`removes the sandbox (including the copied credential) after ${name}`, async () => {
+    it(`removes the sandbox after ${name}`, async () => {
       arrange()
       await complete({ system: 'sys', user: 'usr' }).catch(() => {})
       expect(fs.existsSync(snap.root)).toBe(false)
     })
   }
 
-  it('is unavailable (no spawn) when there is no API key and no auth.json', async () => {
-    fs.rmSync(join(fakeHome, '.codex', 'auth.json'))
+  it('is unavailable (no spawn) without an API key, even with a ChatGPT-login auth.json present', async () => {
+    delete process.env.CODEX_API_KEY
     makeChild({ stdout: 'codex-cli 1.0\n' })
 
     const status = await detect()
     expect(status.available).toBe(false)
-    expect(status.reason).toMatch(/codex login|CODEX_API_KEY/)
+    expect(status.reason).toMatch(/unavailable: set CODEX_API_KEY or OPENAI_API_KEY/)
 
     childProcess.execFile.mockClear()
     const err = await complete({ system: 'sys', user: 'usr' }).catch(e => e)
     expect(err.code).toBe('auth-required')
-    expect(childProcess.execFile).not.toHaveBeenCalled()
-  })
-
-  it('refuses a symlinked auth.json (treated as no credential)', async () => {
-    fs.rmSync(join(fakeHome, '.codex', 'auth.json'))
-    fs.writeFileSync(join(fakeHome, 'elsewhere'), 'secret')
-    fs.symlinkSync(join(fakeHome, 'elsewhere'), join(fakeHome, '.codex', 'auth.json'))
-    makeChild({ stdout: OK_OUT })
-
-    const err = await complete({ system: 'sys', user: 'usr' }).catch(e => e)
-    expect(err.code).toBe('auth-required')
+    expect(err.message).toMatch(/CODEX_API_KEY or OPENAI_API_KEY/)
     expect(childProcess.execFile).not.toHaveBeenCalled()
   })
 

@@ -81,7 +81,7 @@ Every provider exports:
 ```js
 export const id = 'claude-code'              // stable identifier
 export const displayName = 'Claude Code'     // for UI
-export const authSource = '~/.claude'        // for UI ("via ~/.claude login")
+export const authSource = 'ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN'  // for UI
 
 // Detection — runs cheaply at startup
 export async function detect()
@@ -147,7 +147,9 @@ claude -p --output-format json --max-turns 1 --model <model>
 - `--max-turns 1` prevents the agent from trying tool use; we want a one-shot answer
 - Timeout: 60s default, configurable via `setup.aiTimeout`
 
-**Auth:** `~/.claude/` (managed by Claude Code itself — we don't touch it)
+**Isolation (#252):** every external CLI runs in an empty 0700 temp cwd with a throwaway `HOME`, a minimal env (PATH/USER/LANG/LC_ALL + the one auth var) and hardening flags, so repo `CLAUDE.md`/hooks/MCP and the user's agent config are never loaded. The sandbox is removed on success, error, timeout and parent exit/SIGINT/SIGTERM/SIGHUP.
+
+**Auth (env only):** `CLAUDE_CODE_OAUTH_TOKEN` (create with `claude setup-token`) or `ANTHROPIC_API_KEY` (runs with `--bare`). A plain `claude login` session (keychain / `~/.claude`) is not shared with the sandbox, so OAuth-login-only users must run `claude setup-token` once.
 
 **Notes:**
 - Claude Code's `-p` mode is its supported non-interactive interface for exactly this use case.
@@ -168,7 +170,7 @@ codex exec --json --skip-git-repo-check
 - `--json` returns NDJSON event stream; we collect events of type `agent_message` and concatenate `message` fields
 - `--skip-git-repo-check` prevents Codex from refusing to run when invoked outside a repo context
 
-**Auth:** `~/.codex/auth.json` (ChatGPT login or API key — Codex handles both)
+**Auth (env only):** `CODEX_API_KEY` or `OPENAI_API_KEY`. `~/.codex/auth.json` (ChatGPT login) is deliberately not copied into the sandbox: Codex rotates single-use refresh tokens, so a sandboxed refresh would invalidate the user's real login. OAuth-only users see `unavailable: set CODEX_API_KEY or OPENAI_API_KEY`.
 
 **Notes:**
 - Codex is more agentic by default; we use `exec` (non-interactive one-shot) not `tui` mode.
@@ -187,7 +189,7 @@ gemini -p - --output-format json
 - Prompt piped via stdin (the `-` after `-p`)
 - Parse JSON, extract assistant text from `response.text` or `candidates[0].content.parts[0].text`
 
-**Auth:** `~/.gemini/` (Google login) or `GEMINI_API_KEY`
+**Auth (env only):** `GEMINI_API_KEY`. `~/.gemini/oauth_creds.json` (Google login) is not copied, for the same refresh-invalidation reason; OAuth-only users see `unavailable: set GEMINI_API_KEY`.
 
 ### 4.4 Anthropic API (`anthropic-api.js`)
 
@@ -324,7 +326,7 @@ class AIError extends Error {
 
 UI translates these into actionable messages:
 - `no-provider` → "Install Claude Code (`brew install anthropic/tap/claude`), Codex, or Gemini CLI — or set ANTHROPIC_API_KEY."
-- `auth-required` → "Run `claude login` (or `codex login` / `gemini auth`) and try again."
+- `auth-required` → the provider's own message, e.g. "run `claude setup-token` and export CLAUDE_CODE_OAUTH_TOKEN, or set ANTHROPIC_API_KEY" / "set CODEX_API_KEY or OPENAI_API_KEY" / "set GEMINI_API_KEY".
 
 ---
 
