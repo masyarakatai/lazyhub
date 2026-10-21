@@ -14,7 +14,7 @@ Inspect local configuration or repository enforcement coverage.
 Options:
   --config       Check local configuration (default)
   --coverage     Check enforcement coverage for the current repository
-  --ai           Run the AI-assisted doctor report
+  --ai           AI-assisted report (not yet implemented)
   --repo OWNER/NAME  Check coverage for a specific repository
   --json         Emit one JSON report instead of human-readable output
   --help, -h     Show this help text
