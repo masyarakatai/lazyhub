@@ -36,7 +36,7 @@ Alpha supports solo maintainers and pilot repositories. It has two slices.
 | 3 | #250 | Arbitrary daemon passthrough is gone and privileged IPC is authenticated. | Done |
 | 4 | #251 | Only typed reads are cacheable; unknown/write-shaped operations fail closed. | Done |
 | 5 | #252 | Shipped external AI subprocesses use isolated cwd, HOME, config, and environment. | Done |
-| 6 | #253 | Shipped local files, sockets, caches, and diagnostics are permissioned and redacted. | Done |
+| 6 | #253 | Shipped local files, sockets, caches, and diagnostics are permissioned and redacted. | Partial — PR #269 merged; daemon pid-file mode, daemon socket bind→chmod window, Windows pipe naming/ACLs, and cache partitioning remain |
 | 7 | #246 | Watch-only observes GitHub timelines, commits, reviews, and checks with zero agent configuration. | Done |
 | 8 | #133 | Doctor reports evidence-backed coverage and ungoverned paths. | Done |
 | 9 | #70 | First run reaches a useful watch-only report through the existing `gh` login. | Done |
