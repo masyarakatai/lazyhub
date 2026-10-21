@@ -22,6 +22,7 @@ describe('typed reads', () => {
     const args = ['pr', 'diff', '7', '--repo', 'o/r']
     expect(toTypedRead(args, {})).not.toBeNull()
     expect(toTypedRead(args, { GH_TOKEN: 'x' })).toBeNull()
+    expect(toTypedRead(args, { GH_CONFIG_DIR: '/other' })).toBeNull()
     expect(toTypedRead(args, { GH_HOST: 'ghe.example.com' })).toBeNull()
   })
 

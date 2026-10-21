@@ -73,6 +73,17 @@ describe('daemon IPC', () => {
     expect(await msg({ type: 'invalidate', auth })).toMatchObject({ code: 'E_AUTH_REVOKED' })
   })
 
+  it('rotates an expired secret so stop keeps working with the fresh token file', async () => {
+    const stale = readFileSync(ctx.tokenPath, 'utf8')
+    const spy = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 13 * 3600_000)
+    try {
+      expect(await msg({ type: 'invalidate', auth: stale })).toMatchObject({ code: 'E_UNAUTHENTICATED' })
+      const fresh = readFileSync(ctx.tokenPath, 'utf8')
+      expect(fresh).not.toBe(stale)
+      expect(await msg({ type: 'invalidate', auth: fresh })).toMatchObject({ ok: true })
+    } finally { spy.mockRestore() }
+  })
+
   it('fails closed on malformed, version-mismatched, and oversized messages', async () => {
     expect(await rawExchange(ctx.socketPath, 'not json\n')).toMatchObject({ code: 'E_MALFORMED' })
     expect(await rawExchange(ctx.socketPath, '[1]\n')).toMatchObject({ code: 'E_MALFORMED' })

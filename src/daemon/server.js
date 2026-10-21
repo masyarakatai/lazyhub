@@ -121,6 +121,9 @@ export function startDaemon(config = {}, env = process.env) {
     msg.id = id
 
     if (PRIVILEGED_TYPES.has(msg.type)) {
+      // Rotate an expired secret in place so a long-lived daemon stays controllable
+      // (`serve --stop` re-reads the token file); revoked sessions never rotate.
+      if (session && !session.revoked && Date.now() > session.expiresAt) session = issueSession(tokenPath)
       const code = session ? checkSession(session, msg.auth) : ERR.UNAUTHENTICATED
       if (code) return deny(socket, id, code, 'privileged message denied')
     }

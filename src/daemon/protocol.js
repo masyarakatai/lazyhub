@@ -117,7 +117,7 @@ export function buildReadArgs(op, params) {
 
 // Env that makes the daemon's gh identity differ from the caller's; such
 // callers talk to gh directly instead of a shared cached identity.
-const IDENTITY_ENV = ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']
+const IDENTITY_ENV = ['GH_CONFIG_DIR', 'GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']
 
 /**
  * Map an executor gh argv to a typed read request, or null when the argv is not
