@@ -51,7 +51,7 @@ describe.skipIf(!posix)('startIPC endpoint hardening', () => {
     try {
       const path = ipc.startIPC()
       await waitFor(() => existsSync(join(root, 'home', '.lazyhub-socket')))
-      expect(path.startsWith(join(root, 'tmp'))).toBe(true)
+      expect(path.startsWith(join(root, 'home', '.config', 'lazyhub', 'run'))).toBe(true)
       expect(path).not.toMatch(/^\/tmp\/lazyhub-\d+\.sock$/)
       expect(mode(join(path, '..'))).toBe(0o700)
       expect(mode(path)).toBe(0o600)
@@ -69,7 +69,8 @@ describe.skipIf(!posix)('startIPC endpoint hardening', () => {
   })
 
   it('tightens a loose directory we own and refuses a symlinked or foreign-owned one', () => {
-    const dir = join(root, 'tmp', `lazyhub-${process.getuid()}`)
+    const dir = join(root, 'home', '.config', 'lazyhub', 'run')
+    mkdirSync(join(dir, '..'), { recursive: true })
     mkdirSync(dir, { mode: 0o777 })
     chmodSync(dir, 0o777)
     expect(ipc.startIPC()).toBeTruthy()

@@ -7,7 +7,8 @@
  *   $LAZYHUB_SOCKET  (if set)
  *   <private dir>/ipc-<pid>.sock  (default; Windows: random named pipe)
  *
- * The private dir is $XDG_RUNTIME_DIR/lazyhub or <tmpdir>/lazyhub-<uid>: it is
+ * The private dir is $XDG_RUNTIME_DIR/lazyhub or ~/.config/lazyhub/run (never a
+ * shared /tmp path another user could pre-create): it is
  * created 0700 and verified (real directory, owned by us, not group/world
  * accessible) before bind; the socket is chmod 0600; pre-existing symlinks or
  * foreign/non-socket entries at the path are rejected (#253).
@@ -49,10 +50,10 @@
 
 import { createServer } from 'net'
 import { join } from 'path'
-import { homedir, tmpdir } from 'os'
+import { homedir } from 'os'
 import { randomBytes } from 'crypto'
-import { chmodSync, readFileSync, unlinkSync } from 'fs'
-import { assertPrivateDir, ensurePrivateDir, prepareSocketPath, writePrivateFile } from './secure-fs.js'
+import { chmodSync, mkdirSync, readFileSync, unlinkSync } from 'fs'
+import { assertPrivateDir, prepareSocketPath, writePrivateFile } from './secure-fs.js'
 import { logger } from './utils.js'
 import {
   getPRStateForBranch as _defaultGetPRStateForBranch,
@@ -81,8 +82,7 @@ let _defaultPath = null
 function socketDir() {
   const base = process.env.XDG_RUNTIME_DIR
   if (base) return join(base, 'lazyhub')
-  const uid = typeof process.getuid === 'function' ? process.getuid() : 'user'
-  return join(tmpdir(), `lazyhub-${uid}`)
+  return join(homedir(), '.config', 'lazyhub', 'run')
 }
 
 function socketPath() {
@@ -99,12 +99,12 @@ function socketPath() {
  * Validate the bind location before listen(). Throws on any ownership,
  * symlink, type or permission problem; nothing here is best-effort.
  * @param {string} path
- * @param {string} path
  */
 function prepareEndpoint(path) {
   if (process.platform === 'win32') return
   if (!process.env.LAZYHUB_SOCKET) {
-    ensurePrivateDir(socketDir())
+    // Verify before any chmod so a planted symlink is never followed.
+    mkdirSync(socketDir(), { recursive: true, mode: 0o700 })
     assertPrivateDir(socketDir())
   }
   prepareSocketPath(path)

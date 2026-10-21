@@ -90,6 +90,16 @@ function cleanValue(value, depth = 0) {
   return out
 }
 
+// Filters are user-entered and may hold anything; only short enum-like words survive.
+function cleanFilters(filters) {
+  const out = {}
+  for (const [key, value] of Object.entries(filters && typeof filters === 'object' ? filters : {})) {
+    if (typeof value === 'number' || typeof value === 'boolean') out[key] = value
+    else out[key] = typeof value === 'string' && /^[A-Za-z_-]{1,16}$/.test(value) ? value : '[redacted]'
+  }
+  return out
+}
+
 /**
  * Build the redacted debug-state object.
  * @param {object} appState optional app-level state snapshot
@@ -115,13 +125,14 @@ export function collectDebugState(appState = {}) {
       activePane: state.activePane ?? null,
       view: state.view ?? null,
       itemNumber: state.itemNumber ?? null,
-      filters: state.filters ?? {},
+      filters: cleanFilters(state.filters),
       cursors: state.cursors ?? {},
       dialog: state.dialog ?? null,
       mode: state.mode ?? null,
     },
     ghCalls: getGhCallHistory().map(redactGhCall),
-    recentStatus: Array.isArray(state.recentStatus) ? state.recentStatus.slice(-5) : [],
+    // Toast text can embed titles, repo names or API errors; keep only the severity.
+    recentStatus: Array.isArray(state.recentStatus) ? state.recentStatus.slice(-5).map(s => ({ variant: typeof s?.variant === 'string' ? s.variant.slice(0, 16) : null })) : [],
   }
 }
 

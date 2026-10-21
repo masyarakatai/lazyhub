@@ -61,12 +61,14 @@ describe('collectDebugState', () => {
     const state = collectDebugState({
       activePane: 'prs',
       repo: FAKE_REPO,
-      filters: { repository: FAKE_REPO, state: 'open' },
+      filters: { repository: FAKE_REPO, state: 'open', search: 'fake-unlisted-secret-9' },
       comment: { body: FAKE_BODY },
       reviewBody: FAKE_BODY,
       recentStatus: [{ message: `Authorization: Bearer ${FAKE_BEARER} see https://github.com/${FAKE_REPO}/pull/7`, variant: 'error' }],
     })
     const json = JSON.stringify(state)
+    expect(state.app.filters).toEqual({ repository: '[redacted]', state: 'open', search: '[redacted]' })
+    expect(state.recentStatus).toEqual([{ variant: 'error' }])
     for (const secret of [FAKE_PAT, FAKE_BEARER, FAKE_BODY, FAKE_REPO, 'fake-private-repo', 'github.com']) {
       expect(json).not.toContain(secret)
     }
