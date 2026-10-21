@@ -124,7 +124,7 @@ function PRExpandedDetail({ pr, t }) {
   return (
     <Box flexDirection="column" paddingLeft={4}>
       {branch ? (
-        <Text color={t.ui.muted} wrap="truncate">⑂  {branch}</Text>
+        <Text color={t.ui.muted} wrap="truncate">⌥  {branch}</Text>
       ) : null}
       {checks.length > 0 && (
         <Text color={ciColor} wrap="truncate">   {ciParts.join('  ')}</Text>
@@ -270,7 +270,7 @@ function PRDetailPopoverContent({ pr, t, scheme, width }) {
         <Text color={t.ui.dim}>{age}</Text>
       </Box>
       {/* Divider */}
-      <Box><Text color={t.ui.dim}>{'─'.repeat(innerW + 2)}</Text></Box>
+      <Box><Text color={t.ui.dim}>{'─'.repeat(innerW)}</Text></Box>
       {/* Body excerpt */}
       {bodyLines.map((line, idx) => (
         <Box key={idx} paddingX={1}>
@@ -280,7 +280,7 @@ function PRDetailPopoverContent({ pr, t, scheme, width }) {
         </Box>
       ))}
       {/* Divider */}
-      <Box><Text color={t.ui.dim}>{'─'.repeat(innerW + 2)}</Text></Box>
+      <Box><Text color={t.ui.dim}>{'─'.repeat(innerW)}</Text></Box>
       {/* Summary */}
       <Box paddingX={1}>
         <Text color={ciColor}>{ciLabel}</Text>
@@ -290,7 +290,7 @@ function PRDetailPopoverContent({ pr, t, scheme, width }) {
         </Text>
       </Box>
       {/* Divider */}
-      <Box><Text color={t.ui.dim}>{'─'.repeat(innerW + 2)}</Text></Box>
+      <Box><Text color={t.ui.dim}>{'─'.repeat(innerW)}</Text></Box>
       {/* Hint bar */}
       <Box paddingX={1}>
         <Text color={t.ui.dim} wrap="truncate">

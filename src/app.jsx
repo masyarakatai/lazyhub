@@ -213,7 +213,8 @@ export function App({ repo }) {
       if (view === 'conflict')   { setView('detail'); return }
       if (view === 'diff')       { setView(selectedItem?._fromList ? 'list' : 'detail'); return }
       if (view === 'detail')     { setSelectedItem(null); setView('list'); return }
-      exit()
+      // At the root only `q` quits; a stray Esc must never kill the app.
+      if (!key.escape) exit()
       return
     }
 

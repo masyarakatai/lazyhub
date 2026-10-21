@@ -51,22 +51,22 @@ description = "Review and manage pull requests"
 
 [panes.issues]
 label       = "Issues"
-icon        = "◎"
+icon        = "⚑"
 description = "Triage repository issues"
 
 [panes.branches]
 label       = "Branches"
-icon        = "⑂"
+icon        = "⌥"
 description = "Inspect and checkout branches"
 
 [panes.actions]
 label       = "Actions"
-icon        = "⚡"
+icon        = "↯"
 description = "Inspect workflow runs"
 
 [panes.notifications]
 label       = "Notifications"
-icon        = "◈"
+icon        = "✦"
 description = "Review GitHub notifications"
 
 # ── Feature defaults consumed by legacy call sites through config.js ─────
@@ -179,7 +179,7 @@ group = "meta"
 keys = ["q", "Esc"]
 hint = "q / Esc"
 label = "back"
-description = "Back one level, or quit at root"
+description = "Back one level; q quits at the root, Esc never does"
 scope = "global"
 group = "global"
 

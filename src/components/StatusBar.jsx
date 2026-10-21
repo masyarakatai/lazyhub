@@ -7,12 +7,12 @@ import { sanitize } from '../utils.js'
 
 const PANE_META = {
   prs:           { icon: '⎇',  label: 'Pull Requests' },
-  issues:        { icon: '◆',  label: 'Issues'        },
-  branches:      { icon: '⑂',  label: 'Branches'      },
-  actions:       { icon: '⚡', label: 'Actions'       },
-  notifications: { icon: '◔',  label: 'Notifications' },
-  settings:      { icon: '⊙',  label: 'Settings'      },
-  logs:          { icon: '≡',  label: 'Logs'          },
+  issues:        { icon: '⚑',  label: 'Issues'        },
+  branches:      { icon: '⌥',  label: 'Branches'      },
+  actions:       { icon: '↯', label: 'Actions'       },
+  notifications: { icon: '✦',  label: 'Notifications' },
+  settings:      { icon: '⌘',  label: 'Settings'      },
+  logs:          { icon: '⌸',  label: 'Logs'          },
 }
 
 // Mode chip colors — uses semantic tokens if available, falls back to ci/ui tokens
@@ -46,7 +46,7 @@ export function StatusBar({ repo, pane, count, filterState, scopeIndicator, mode
     return () => clearInterval(id)
   }, [])
 
-  const meta    = PANE_META[pane] || { icon: '◈', label: pane || '' }
+  const meta    = PANE_META[pane] || { icon: '✦', label: pane || '' }
   const dot     = <Text color={t.ui.dim}>  ·  </Text>
   const chipClr = modeColor(mode, t)
   const narrow  = cols < 100

@@ -14,9 +14,8 @@ import { parseDiff, flattenFiles } from './diff-parser.js'
 /**
  * Build a minimal unified-diff fixture with the given code line as a + line.
  *
- * Note: the `--- a/file` header line begins with `-` so parseDiff (faithfully)
- * treats it as a del row. We omit it here to keep fixtures unambiguous; in
- * production the `--- ` line is harmless noise rendered as a dim deleted row.
+ * Note: this minimal fixture omits the `index`/`---` header lines; the full
+ * real-format header is covered in "file header metadata" below.
  *
  * @param {string} codeLine - The added-line content to inject into the fixture.
  * @returns {string} A unified-diff string containing the codeLine as a + row.
@@ -155,5 +154,63 @@ describe('flattenFiles', () => {
     for (const row of rows) {
       expect(row.filename).toBe('a.js')
     }
+  })
+})
+
+// ── Bug: extended file header lines rendered as code rows ────────────────────
+
+describe('parseDiff — file header metadata', () => {
+  const REAL = [
+    'diff --git a/src/foo.js b/src/foo.js',
+    'index 3f2a1c0..9b7d4e2 100644',
+    '--- a/src/foo.js',
+    '+++ b/src/foo.js',
+    '@@ -1,2 +1,2 @@',
+    ' keep',
+    '-old',
+    '+new',
+    '\\ No newline at end of file',
+  ].join('\n')
+
+  it('does not emit index/---/+++ header lines or "No newline" markers as content rows', () => {
+    const [file] = parseDiff(REAL)
+    expect(file.filename).toBe('src/foo.js')
+    expect(file.lines.map(l => l.type)).toEqual(['hunk', 'ctx', 'del', 'add'])
+    expect(file.addCount).toBe(1)
+    expect(file.delCount).toBe(1)
+    expect(file.lines[1].oldLine).toBe(1)
+  })
+
+  it('ignores mode/rename metadata and takes the filename from the diff header for renames and binaries', () => {
+    const files = parseDiff([
+      'diff --git a/old.txt b/new.txt',
+      'similarity index 100%',
+      'rename from old.txt',
+      'rename to new.txt',
+      'diff --git a/img.png b/img.png',
+      'new file mode 100644',
+      'index 0000000..1111111',
+      'Binary files /dev/null and b/img.png differ',
+    ].join('\n'))
+    expect(files.map(f => f.filename)).toEqual(['new.txt', 'img.png'])
+    expect(files.every(f => f.lines.length === 0)).toBe(true)
+  })
+
+  it('treats `--- x` / `+++ x` inside a hunk as ordinary deleted/added lines', () => {
+    const [file] = parseDiff([
+      'diff --git a/a.md b/a.md',
+      '--- a/a.md',
+      '+++ b/a.md',
+      '@@ -1,1 +1,1 @@',
+      '--- removed rule',
+      '+++ added rule',
+    ].join('\n'))
+    expect(file.filename).toBe('a.md')
+    expect(file.lines.slice(1).map(l => [l.type, l.text])).toEqual([['del', '-- removed rule'], ['add', '++ added rule']])
+  })
+
+  it('keeps the original filename for deleted files (+++ /dev/null)', () => {
+    const [file] = parseDiff(['diff --git a/gone.js b/gone.js', 'deleted file mode 100644', '--- a/gone.js', '+++ /dev/null', '@@ -1 +0,0 @@', '-bye'].join('\n'))
+    expect(file.filename).toBe('gone.js')
   })
 })

@@ -13,10 +13,10 @@ const BUILTIN_LABELS = {
 
 const BUILTIN_ICONS = {
   prs:           '⎇',
-  issues:        '◎',
-  branches:      '⑂',
-  actions:       '⚡',
-  notifications: '◈',
+  issues:        '⚑',
+  branches:      '⌥',
+  actions:       '↯',
+  notifications: '✦',
 }
 
 export function Sidebar({ currentPane, onSelect, height, visiblePanes, paneLabels, paneIcons, repo, width = 24, borderStyle = 'round', borderRight = true, paneCounts = {} }) {
@@ -32,7 +32,7 @@ export function Sidebar({ currentPane, onSelect, height, visiblePanes, paneLabel
 
   const allItems = (visiblePanes || Object.keys(BUILTIN_LABELS)).map((id, idx) => ({
     pane:  id,
-    icon:  icons[id] || '◈',
+    icon:  icons[id] || '✦',
     label: (labels[id] || id).slice(0, INNER - 5),
     num:   idx + 1,
     count: paneCounts[id] || 0,

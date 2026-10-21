@@ -46,7 +46,7 @@ function customPanesFromToml(toml) {
     custom[id] = {
       id,
       label: pane.label || id,
-      icon: pane.icon || '◈',
+      icon: pane.icon || '✦',
       command: pane.command,
       actions: pane.actions || {},
     }

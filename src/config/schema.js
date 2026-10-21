@@ -79,10 +79,10 @@ export const DEFAULT_CONFIG = {
   },
   panes: {
     prs:           { label: 'Pull Requests', icon: '⎇', description: 'Review and manage pull requests' },
-    issues:        { label: 'Issues', icon: '◎', description: 'Triage repository issues' },
-    branches:      { label: 'Branches', icon: '⑂', description: 'Inspect and checkout branches' },
-    actions:       { label: 'Actions', icon: '⚡', description: 'Inspect workflow runs' },
-    notifications: { label: 'Notifications', icon: '◈', description: 'Review GitHub notifications' },
+    issues:        { label: 'Issues', icon: '⚑', description: 'Triage repository issues' },
+    branches:      { label: 'Branches', icon: '⌥', description: 'Inspect and checkout branches' },
+    actions:       { label: 'Actions', icon: '↯', description: 'Inspect workflow runs' },
+    notifications: { label: 'Notifications', icon: '✦', description: 'Review GitHub notifications' },
   },
   features: {
     prs:     { default_filter: 'open', default_scope: 'mine', page_size: 100 },
@@ -151,7 +151,7 @@ export const DEFAULT_CONFIG = {
     'app.help':              { keys: ['?'], hint: '?', label: 'help', description: 'Toggle contextual help', scope: 'global', group: 'meta' },
     'app.settings':          { keys: ['S'], hint: 'S', label: 'settings', description: 'Open settings', scope: 'global', group: 'meta' },
     'app.open-config':       { keys: ['E'], hint: 'E', label: 'edit config', description: 'Open lazyhub.toml in the editor', scope: 'global', group: 'meta' },
-    'app.back':              { keys: ['q', 'Esc'], hint: 'q / Esc', label: 'back', description: 'Back one level, or quit at root', scope: 'global', group: 'global' },
+    'app.back':              { keys: ['q', 'Esc'], hint: 'q / Esc', label: 'back', description: 'Back one level; q quits at the root, Esc never does', scope: 'global', group: 'global' },
     'command-palette.open':  { keys: [':', '<space><space>'], hint: ':', label: 'command palette', description: 'Open the command palette', scope: 'global', group: 'global' },
     'app.visual-toggle':     { keys: ['V'], hint: 'V', label: 'visual', description: 'Toggle visual selection mode', scope: 'global', group: 'global' },
     'app.logs':              { keys: ['L'], hint: 'L', label: 'logs', description: 'Open debug logs when LAZYHUB_DEBUG=1', scope: 'global', group: 'debug' },

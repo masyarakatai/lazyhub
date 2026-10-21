@@ -28,7 +28,7 @@
  */
 
 import React from 'react'
-import { Box, useInput } from 'ink'
+import { Box, Text, useInput } from 'ink'
 
 // ─── Position calculator (pure — testable without React) ──────────────────────
 
@@ -163,6 +163,11 @@ export function Popover({
       flexDirection="column"
       overflow="hidden"
     >
+      {/* Ink only writes the cells a Text occupies, so without an opaque fill the
+          host's rows show through every blank cell of the popover. */}
+      <Box position="absolute">
+        <Text>{Array(popoverHeight).fill(' '.repeat(popoverWidth)).join('\n')}</Text>
+      </Box>
       {children}
     </Box>
   )

@@ -22,7 +22,7 @@ exports[`major screen golden snapshots > covers all 80-column major screens > 80
 │                                                                                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
- ⚡  Actions   ·  owner/repo                                                              ⟳ just now
+ ↯  Actions  ·  owner/repo                                                               ⟳ just now
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  j/k nav │ Tab pane  ┊  Enter logs │ R re-run  ┊  r refresh │ S settings                   │ ? help"
 `;
@@ -49,7 +49,7 @@ exports[`major screen golden snapshots > covers all 80-column major screens > 80
 │                                                                                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
- ⑂  Branches  ·  owner/repo                                                              ⟳ just now
+ ⌥  Branches  ·  owner/repo                                                              ⟳ just now
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  j/k nav │ Tab pane  ┊  Enter checkout │ n new │ D delete  ┊  r refresh │ S settings       │ ? help"
 `;
@@ -157,7 +157,7 @@ assignee @octocat
 
 
 
- ◆  Issues  ·  owner/repo                                                                ⟳ just now
+ ⚑  Issues  ·  owner/repo                                                                ⟳ just now
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  j/k scroll │ l labels │ A assignees │ Esc back                                       │ ? more keys"
 `;
@@ -184,7 +184,7 @@ exports[`major screen golden snapshots > covers all 80-column major screens > 80
 │                                                                                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
- ◆  Issues  ·  owner/repo                                                                ⟳ just now
+ ⚑  Issues  ·  owner/repo                                                                ⟳ just now
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  j/k nav │ Tab pane  ┊  Enter open │ n new  ┊  r refresh │ S settings                      │ ? help"
 `;
@@ -211,7 +211,7 @@ exports[`major screen golden snapshots > covers all 80-column major screens > 80
 │                                                                                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
- ◔  Notifications  ·  owner/repo                                                         ⟳ just now
+ ✦  Notifications  ·  owner/repo                                                         ⟳ just now
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  j/k nav │ Tab pane  ┊  r refresh │ S settings                                             │ ? help"
 `;

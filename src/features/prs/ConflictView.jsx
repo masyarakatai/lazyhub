@@ -311,7 +311,7 @@ export function ConflictView({ pr, repo, onBack, onResolved }) {
       borderStyle="single" borderColor={t.ui.border}
       borderTop={false} borderLeft={false} borderRight={false} borderBottom={true}>
       <Box gap={1} flexGrow={1}>
-        <Text color={t.pr.conflict || t.ci.pending} bold>⚡</Text>
+        <Text color={t.pr.conflict || t.ci.pending} bold>↯</Text>
         <Text color={t.ui.selected} bold>Conflict Resolution</Text>
         <Text color={t.ui.dim}>·</Text>
         <Text color={t.ui.dim}>PR</Text>
@@ -398,7 +398,7 @@ export function ConflictView({ pr, repo, onBack, onResolved }) {
         <Box flexDirection="column" flexGrow={1} paddingX={2} paddingY={1} gap={1}>
 
           <Box gap={1}>
-            <Text color={t.pr.conflict || t.ci.pending} bold>⚡ PR #{pr.number}</Text>
+            <Text color={t.pr.conflict || t.ci.pending} bold>↯ PR #{pr.number}</Text>
             <Text color={t.ui.muted}>has conflicts with</Text>
             <Text color={t.ui.selected} bold>{pr.baseRefName}</Text>
           </Box>

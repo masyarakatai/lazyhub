@@ -14,7 +14,7 @@ export function TabStrip({ panes = [], currentPane, paneLabels = {}, paneIcons =
     <Box flexDirection="row" paddingX={1}>
       {panes.map((pane, i) => {
         const active = pane === currentPane
-        const icon   = paneIcons[pane]  || '◈'
+        const icon   = paneIcons[pane]  || '✦'
         const label  = paneLabels[pane] || pane
         return (
           <Box key={pane}>

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import stringWidth from 'string-width'
 import {
   DEFAULT_CONFIG,
   BUILTIN_SCOPES,
@@ -268,5 +269,14 @@ describe('agent default scope', () => {
     const { config, warnings } = validateConfig({ agent: { default_scope: 'full' } })
     expect(config.agent.default_scope).toBe('full')
     expect(warnings.some(w => w.includes('agent mutations stay disabled'))).toBe(true)
+  })
+})
+
+describe('default pane icons', () => {
+  // Terminals and Ink disagree on the width of emoji-presentation and East Asian
+  // ambiguous glyphs, which shifts box borders. Defaults must be 1 column everywhere.
+  it.each(Object.entries(DEFAULT_CONFIG.panes))('%s icon is one column wide in narrow and wide-ambiguous terminals', (_pane, { icon }) => {
+    expect(stringWidth(icon, { ambiguousIsNarrow: true })).toBe(1)
+    expect(stringWidth(icon, { ambiguousIsNarrow: false })).toBe(1)
   })
 })

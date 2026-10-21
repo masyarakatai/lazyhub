@@ -23,24 +23,6 @@ const OUT = join(ROOT, 'docs', 'demo', 'out')
 const BIN = join(ROOT, 'dist', 'lazyhub.js')
 const SHIM = join(ROOT, 'scripts', 'demo', 'gh-shim.mjs')
 
-// Minimal config. Pane icons are plain single-width characters: the default glyphs
-// (e.g. the emoji-width lightning bolt) make terminals and Ink disagree on column
-// widths, which shifts box borders in the recordings.
-const DEMO_CONFIG = `[meta]
-schema_version = "1.0"
-
-[panes.prs]
-icon = "+"
-[panes.issues]
-icon = "o"
-[panes.branches]
-icon = "Y"
-[panes.actions]
-icon = "*"
-[panes.notifications]
-icon = "!"
-`
-
 const shq = s => `'${String(s).replace(/'/g, `'\\''`)}'`
 
 function ensureVhs() {
@@ -87,7 +69,7 @@ async function main() {
   installWrappers(bin)
   // A config file keeps first-run onboarding from taking over the recording.
   mkdirSync(join(home, '.config', 'lazyhub'), { recursive: true })
-  writeFileSync(join(home, '.config', 'lazyhub', 'lazyhub.toml'), DEMO_CONFIG)
+  writeFileSync(join(home, '.config', 'lazyhub', 'lazyhub.toml'), '[meta]\nschema_version = "1.0"\n')
 
   // vhs itself keeps the real HOME (it caches a browser there); the recorded
   // shell switches to DEMO_HOME/DEMO_BIN in the hidden setup of _settings.tape.

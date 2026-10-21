@@ -41,4 +41,4 @@ The repository setting "Allow GitHub Actions to create and approve pull requests
 
 ## Fonts
 
-Tapes use `Hack Nerd Font Mono` (falls back to JetBrains Mono, then monospace). Pane icons are overridden in the demo config with single-width characters: the default glyphs (notably the lightning bolt) have ambiguous or double width, which makes Ink and the terminal disagree on columns and shifts box borders.
+Tapes use `Hack Nerd Font Mono` (falls back to JetBrains Mono, then monospace).

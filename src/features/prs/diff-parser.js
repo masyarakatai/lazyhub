@@ -29,19 +29,25 @@ export function parseDiff(diffText) {
   let currentFile = null
   let oldLine = 0
   let newLine = 0
+  let inHunk = false
 
   for (const raw of diffText.split('\n')) {
     if (raw.startsWith('diff --git')) {
-      currentFile = { header: raw, filename: '', addCount: 0, delCount: 0, lines: [] }
+      const hm = raw.match(/ b\/(.+)$/)
+      currentFile = { header: raw, filename: hm ? hm[1] : '', addCount: 0, delCount: 0, lines: [] }
       files.push(currentFile)
       oldLine = 0; newLine = 0
-    } else if (raw.startsWith('+++ ') && currentFile) {
-      currentFile.filename = raw.slice(4).replace(/^b\//, '')
+      inHunk = false
+    } else if (currentFile && !inHunk && !raw.startsWith('@@')) {
+      // Extended header (index, mode, rename, ---/+++, Binary files) is metadata, not content.
+      if (raw.startsWith('+++ ') && raw !== '+++ /dev/null') currentFile.filename = raw.slice(4).replace(/^b\//, '')
     } else if (raw.startsWith('@@') && currentFile) {
+      inHunk = true
       const m = raw.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
       if (m) { oldLine = parseInt(m[1], 10); newLine = parseInt(m[2], 10) }
       currentFile.lines.push({ type: 'hunk', text: raw, oldLine: null, newLine: null })
     } else if (currentFile) {
+      if (raw.startsWith('\\')) continue // "\ No newline at end of file"
       if (raw.startsWith('+')) {
         currentFile.lines.push({ type: 'add', text: decodeHtmlEntities(raw.slice(1)), oldLine: null, newLine: newLine++ })
         currentFile.addCount++

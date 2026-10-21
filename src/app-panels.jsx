@@ -99,7 +99,7 @@ export function PaneHeader({ pane, count, loading, error, isStale }) {
     <Box paddingX={1} paddingY={0} gap={1}
          borderStyle="single" borderTop={false} borderLeft={false} borderRight={false}
          borderColor={t.ui.divider}>
-      <Text color={t.ui.selected} bold>{PANE_ICONS[pane] || '◈'}  {PANE_LABELS[pane] || pane}</Text>
+      <Text color={t.ui.selected} bold>{PANE_ICONS[pane] || '✦'}  {PANE_LABELS[pane] || pane}</Text>
       {count != null && !loading && <Text color={t.ui.dim}>{count}</Text>}
       {isStale && <Text color={t.ui.muted}>⟳ refreshing</Text>}
       {loading && <Text color={t.ui.muted}>loading…</Text>}

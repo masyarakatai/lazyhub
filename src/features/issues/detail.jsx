@@ -182,7 +182,7 @@ export function IssueDetail({ issueNumber, repo, onBack }) {
             </Box>
           )}
           {issue.milestone?.title && (
-            <Text color={t.ui.dim}>◎ {issue.milestone.title}</Text>
+            <Text color={t.ui.dim}>⚑ {issue.milestone.title}</Text>
           )}
         </Box>
       </Box>

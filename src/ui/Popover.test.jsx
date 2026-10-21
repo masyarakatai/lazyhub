@@ -5,8 +5,14 @@
  * to verify the right → below → above → left priority chain and edge-clamping.
  */
 
-import { describe, it, expect } from 'vitest'
-import { calcPopoverPosition } from './Popover.jsx'
+import { describe, it, expect, afterEach } from 'vitest'
+import React from 'react'
+import { Box, Text } from 'ink'
+import { render, cleanup } from 'ink-testing-library'
+import { calcPopoverPosition, Popover } from './Popover.jsx'
+import { PRDetailPopoverContentMemo, POPOVER_WIDTH, POPOVER_HEIGHT } from '../features/prs/list-row.jsx'
+import { schemeToT } from '../features/prs/list.jsx'
+import lazyhubDark from '../theme/schemes/lazyhub-dark.js'
 
 // Helper: build a typical anchor at column `x`, row `y`, size `w`×`h`
 function anchor(x, y, w = 60, h = 1) {
@@ -223,5 +229,39 @@ describe('calcPopoverPosition — exact boundary conditions', () => {
     // below: left=0, top=1; 0+11=11 ≤ 20, 1+5=6 ≤ 30 → yes
     expect(pos.left).toBe(0)
     expect(pos.top).toBe(1)
+  })
+})
+
+// ── Rendering: popover must be opaque and keep its declared height ───────────
+
+describe('Popover rendering', () => {
+  afterEach(() => cleanup())
+
+  const pr = {
+    number: 7, title: 'Short title', state: 'OPEN', baseRefName: 'main',
+    author: { login: 'octo' }, updatedAt: new Date().toISOString(),
+    body: '## Summary\nA\n## Test plan\nB', statusCheckRollup: [],
+  }
+
+  it('does not let rows beneath the popover bleed through its blank cells', () => {
+    const rows = Array.from({ length: 20 }, () => 'X'.repeat(80))
+    const { lastFrame } = render(
+      <Box flexDirection="column" width={80}>
+        {rows.map((r, i) => <Text key={i}>{r}</Text>)}
+        <Popover anchor={anchor(4, 2, 10, 1)} popoverWidth={30} popoverHeight={8} termCols={80} termRows={20} preferredSide="below" onClose={() => {}}>
+          <Box borderStyle="round" width={30}><Text>hi</Text></Box>
+        </Popover>
+      </Box>
+    )
+    // Popover occupies columns 4..34, rows 3..10; nothing but popover content may remain there.
+    const lines = lastFrame().split('\n').slice(3, 11)
+    for (const line of lines) expect(line.slice(4, 34)).not.toContain('X')
+  })
+
+  it('PR popover content renders exactly POPOVER_HEIGHT rows (dividers do not wrap)', () => {
+    const { lastFrame } = render(
+      <PRDetailPopoverContentMemo pr={pr} t={schemeToT(lazyhubDark)} scheme={lazyhubDark} width={POPOVER_WIDTH} />
+    )
+    expect(lastFrame().split('\n')).toHaveLength(POPOVER_HEIGHT)
   })
 })

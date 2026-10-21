@@ -305,3 +305,22 @@ To prevent merge conflicts and "branch drift":
 **B-49 — Maintenance scripts used outdated section references and CI included redundant Node versions**
 - Root cause: `auto-docs.mjs` targeted incorrect section indices and used fragile splicing logic; CI matrix included Node 20 which is no longer the target runtime.
 - Fix: Updated internal scripts to point to Section 21; simplified documentation auto-updates to append-only; restricted CI matrix to Node 22; updated LLM model string to stable `gemini-2.5-flash`.
+
+> B-55..B-58 are numbered after B-54, which PR #274 (consolidated Slice 1 bug log, still open when this was written) is expected to add. Renumber if #274 lands differently.
+
+**B-55 — Default pane icons broke box borders (emoji-width and ambiguous-width glyphs)**
+- Symptom: Borders shifted, a blank row appeared at the sidebar Actions row and Focus rows jumped onto the sidebar line in recordings.
+- Root cause: Defaults used `⚡` (emoji presentation, 2 columns) and East Asian ambiguous `◎`/`◈` (plus the rarely-covered `⑂`), so Ink's layout width and the terminal's drawn width disagreed. Hard-coded copies in `Sidebar.jsx`, `StatusBar.jsx`, `ConflictView.jsx`, `list-row.jsx`, `issues/detail.jsx` had the same problem. `displayWidth()` (string-width) already counts `⚡` as 2 correctly, so no width-function change was needed for user-configured icons.
+- Fix: Defaults are now `⎇ ⚑ ⌥ ↯ ✦` (East Asian Width N, one column, no emoji presentation) in `schema.js`, `defaultConfig.toml` and every fallback/status-line copy. Test asserts every default icon is one column under both ambiguous-width settings.
+
+**B-56 — PR-list auto-popover bled the list rows through and overflowed its height**
+- Root cause: (1) `Popover` is `position: absolute` and Ink only writes cells a `Text` occupies, so blank popover cells showed the rows beneath. (2) `PRDetailPopoverContent` dividers were `innerW + 2` wide inside a box whose inner width is `innerW`, so each wrapped to a second row (18 rows vs `POPOVER_HEIGHT` 15). Independent of B-55.
+- Fix: `Popover` paints an opaque space-filled layer behind its children; dividers are `innerW` wide.
+
+**B-57 — Diff header lines (`index`, `---`, `+++`) rendered as code rows**
+- Root cause: `parseDiff` only special-cased `+++ `; every other pre-hunk line (`index …`, `--- a/…`, mode/rename lines) fell through to ctx/del rows with line numbers, and `+++ `/`--- ` lines inside a hunk body were misread as headers. `\ No newline at end of file` was also counted as a context line. The demo fixture was well-formed (real `gh pr diff` format).
+- Fix: Track `inHunk`; everything between `diff --git` and the first `@@` is metadata (filename taken from the `diff --git` line, `+++ b/…` override, `/dev/null` ignored); `\` marker lines are skipped.
+
+**B-58 — Esc at the root of a pane quit the app**
+- Root cause: `app.back` handler fell through to `exit()` for any matching key, and Esc is bound to `app.back` alongside `q`.
+- Fix: At the root only `q` exits; Esc is a no-op there and still steps back from detail/diff/comments/conflict/settings/logs/help. Action description updated.
