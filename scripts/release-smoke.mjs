@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Post-publish smoke test for a published lazyhub version.
 //
-// Usage: node scripts/release-smoke.mjs <version> [--package lazyhub]
+// Usage: node scripts/release-smoke.mjs <version>
 //
 // Downloads the exact tarball from the registry (not the build workspace) and
 // checks: its integrity matches the registry record, a SLSA provenance
@@ -16,13 +16,11 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const args = process.argv.slice(2)
-const version = args.find((a) => !a.startsWith('--'))
-const pkgIdx = args.indexOf('--package')
-const pkg = pkgIdx >= 0 ? args[pkgIdx + 1] : 'lazyhub'
+const version = process.argv[2]
+const pkg = 'lazyhub'
 
-if (!version || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version) || !pkg) {
-  console.error('usage: release-smoke.mjs <version> [--package <name>]')
+if (!version || !/^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/.test(version)) {
+  console.error('usage: release-smoke.mjs <version>')
   process.exit(2)
 }
 

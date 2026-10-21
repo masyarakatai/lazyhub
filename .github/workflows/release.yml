@@ -33,7 +33,7 @@ jobs:
 
       # Trusted publishing requires npm CLI >= 11.5.1 (Node 22 bundles npm 10).
       - name: Install npm with trusted-publishing support
-        run: npm install -g npm@^11.5.1
+        run: npm install -g npm@11.21.1
 
       - name: Verify tag matches package.json version
         run: |
@@ -65,13 +65,13 @@ jobs:
           node-version: 22
 
       - name: Install npm with signature/attestation verification
-        run: npm install -g npm@^11.5.1
+        run: npm install -g npm@11.21.1
 
       - name: Verify published tarball
         run: |
           # Registry propagation can lag the publish by a short while.
           for i in $(seq 1 12); do
-            npm view "lazyhub@${GITHUB_REF_NAME#v}" version >/dev/null 2>&1 && break
+            [ -n "$(npm view "lazyhub@${GITHUB_REF_NAME#v}" dist.attestations.url 2>/dev/null)" ] && break
             echo "waiting for registry ($i/12)"; sleep 10
           done
           node scripts/release-smoke.mjs "${GITHUB_REF_NAME#v}"

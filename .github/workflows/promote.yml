@@ -35,11 +35,14 @@ jobs:
 
       # dist-tag over OIDC requires npm >= 11.21.0 (or >= 12.2.0).
       - name: Install npm with OIDC dist-tag support
-        run: npm install -g npm@^11.21.0
+        run: npm install -g npm@11.21.1
 
       - name: Confirm version input
+        env:
+          VERSION: ${{ inputs.version }}
+          CONFIRM: ${{ inputs.confirm_version }}
         run: |
-          if [ "${{ inputs.version }}" != "${{ inputs.confirm_version }}" ]; then
+          if [ "$VERSION" != "$CONFIRM" ]; then
             echo "::error::version and confirm_version must match"
             exit 1
           fi

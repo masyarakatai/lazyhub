@@ -20,7 +20,7 @@ promotion moves a soaked build to `latest` and updates Homebrew.
 
 ## npm Trusted Publisher Setup (one-time, maintainer)
 
-Requirements (from docs.npmjs.com/trusted-publishers): npm CLI >= 11.5.1 and
+Workflows pin npm 11.21.1. Requirements (from docs.npmjs.com/trusted-publishers): npm CLI >= 11.5.1 and
 Node >= 22.14 to publish; npm CLI >= 11.21.0 (or >= 12.2.0) for `npm dist-tag`
 over OIDC; the job needs `id-token: write`; GitHub-hosted runners only. The
 workflow filename and environment name are case-sensitive and are **not
