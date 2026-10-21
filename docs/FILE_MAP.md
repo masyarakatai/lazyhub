@@ -211,7 +211,7 @@ Test file counts by directory:
 | `src/ai/` | 3 |
 | `src/ai/providers/` | 4 |
 | `src/cli/` | 1 |
-| `src/cli/doctor/` | 3 |
+| `src/cli/doctor/` | 4 |
 | `src/config/` | 6 |
 | `src/daemon/` | 7 |
 | `src/features/prs/` | 2 |
@@ -222,4 +222,4 @@ Test file counts by directory:
 | `src/watch-only/` | 1 |
 
 **Total non-test source files:** 132
-**Total test files:** 49
+**Total test files:** 50

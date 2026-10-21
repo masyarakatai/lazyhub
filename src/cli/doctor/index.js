@@ -16,6 +16,10 @@ export async function runDoctor(argv = process.argv.slice(2), out = process.stdo
   const json = argv.includes('--json')
   const coverage = argv.includes('--coverage')
   const configOnly = argv.includes('--config') || (!argv.includes('--ai') && !coverage)
+  if (json && configOnly && coverage) {
+    err.write('lazyhub doctor: --json accepts one report; use --config or --coverage, not both\n')
+    return 2
+  }
   let ok = true
   if (configOnly) {
     const report = checkConfig()
