@@ -16,10 +16,14 @@ export class DaemonCache {
   }
 
   /**
+   * Cache identity always includes host, account, and repo so entries never
+   * cross GitHub identities.
+   *
    * @param {unknown[]} parts
+   * @param {{host?:string, account?:string, repo?:string}} [identity]
    */
-  key(parts) {
-    return cacheKey(['daemon', ...parts])
+  key(parts, { host = null, account = null, repo = null } = {}) {
+    return cacheKey(['daemon', host, account, repo, ...parts])
   }
 
   /**

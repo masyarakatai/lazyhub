@@ -1,8 +1,11 @@
 import { existsSync, mkdirSync, unlinkSync } from 'fs'
 import { homedir, userInfo } from 'os'
-import { dirname } from 'path'
+import { dirname, join } from 'path'
 import { connect } from 'net'
 import { spawn } from 'child_process'
+import {
+  PROTOCOL_VERSION, MAX_MESSAGE_BYTES, daemonSpawnEnv, isUntrustedAgentContext, readSessionToken,
+} from './protocol.js'
 
 function expandHome(path) {
   if (!path) return path
@@ -31,6 +34,15 @@ export function daemonPidPath(config = {}) {
 }
 
 /**
+ * Session secret file; lives beside the pid file in the user-private daemon dir.
+ *
+ * @param {object} config
+ */
+export function daemonTokenPath(config = {}) {
+  return join(dirname(daemonPidPath(config)), 'daemon.token')
+}
+
+/**
  * @param {string} socketPath
  */
 export function ensureSocketDir(socketPath) {
@@ -52,8 +64,9 @@ export function removeStaleSocket(socketPath) {
  * @param {string} socketPath
  * @param {object} message
  * @param {number} timeoutMs
+ * @param {{tokenPath?: string}} [opts] tokenPath attaches the session secret for privileged messages
  */
-export function requestDaemon(socketPath, message, timeoutMs = 1000) {
+export function requestDaemon(socketPath, message, timeoutMs = 1000, opts = {}) {
   return new Promise((resolve, reject) => {
     const socket = connect(socketPath)
     const id = message.id || String(Date.now())
@@ -64,10 +77,17 @@ export function requestDaemon(socketPath, message, timeoutMs = 1000) {
     }, timeoutMs)
 
     socket.on('connect', () => {
-      socket.write(JSON.stringify({ ...message, id }) + '\n')
+      const auth = opts.tokenPath ? readSessionToken(opts.tokenPath) : null
+      socket.write(JSON.stringify({ ...message, v: PROTOCOL_VERSION, id, ...(auth ? { auth } : {}) }) + '\n')
     })
     socket.on('data', chunk => {
       buffer += chunk.toString()
+      if (buffer.length > MAX_MESSAGE_BYTES * 64) {
+        clearTimeout(timer)
+        socket.destroy()
+        reject(new Error('daemon response too large'))
+        return
+      }
       const lines = buffer.split('\n')
       buffer = lines.pop()
       for (const line of lines) {
@@ -77,7 +97,7 @@ export function requestDaemon(socketPath, message, timeoutMs = 1000) {
           if (parsed.id === id) {
             clearTimeout(timer)
             socket.end()
-            if (parsed.error) reject(new Error(parsed.error))
+            if (parsed.error) reject(Object.assign(new Error(parsed.error), { code: parsed.code }))
             else resolve(parsed)
           }
         } catch {
@@ -108,12 +128,13 @@ export async function ensureDaemon(config = {}, entrypoint) {
     process.env.LAZYHUB_DAEMON_SOCKET = socketPath
     return socketPath
   } catch {
-    // Spawn below.
+    // Spawn below, unless the caller is not a trusted interactive session.
   }
+  if (isUntrustedAgentContext()) return null
   const child = spawn(process.execPath, [entrypoint, 'serve', '--json'], {
     detached: true,
     stdio: 'ignore',
-    env: { ...process.env, LAZYHUB_DAEMON_CHILD: '1' },
+    env: daemonSpawnEnv(),
   })
   child.unref()
   for (let i = 0; i < 20; i += 1) {

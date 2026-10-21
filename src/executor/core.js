@@ -11,6 +11,7 @@ import { GhError } from './gh-error.js'
 import { recordDuration } from '../perf.js'
 import { invalidateRepoCache } from '../cache.js'
 import { requestDaemon } from '../daemon/lifecycle.js'
+import { toTypedRead } from '../daemon/protocol.js'
 import { isGhMutation, writeAuditEntry } from '../daemon/audit.js'
 
 // Re-exported so `import { GhError } from './executor.js'` keeps working.
@@ -75,15 +76,15 @@ export function getGhCallHistory() {
  */
 export async function runGh(args, opts = {}) {
   const { timeout = GH_TIMEOUT, json, stdin, skipDaemon, ttl } = opts
-  if (!skipDaemon && process.env.LAZYHUB_DAEMON_SOCKET && !isGhMutation(args)) {
+  const typed = !skipDaemon && process.env.LAZYHUB_DAEMON_SOCKET && stdin === undefined && json !== false
+    ? toTypedRead(args)
+    : null
+  if (typed) {
     try {
       const response = await requestDaemon(process.env.LAZYHUB_DAEMON_SOCKET, {
-        type: 'gh',
-        args,
-        stdin,
-        json,
+        type: 'read',
+        ...typed,
         ttl,
-        repo: repoFromArgs(args),
       }, Math.min(timeout, 5000))
       return response.payload
     } catch {

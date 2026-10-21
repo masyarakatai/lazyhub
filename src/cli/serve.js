@@ -1,6 +1,6 @@
 import { loadConfig } from '../config.js'
 import { startDaemon } from '../daemon/server.js'
-import { daemonSocketPath, requestDaemon } from '../daemon/lifecycle.js'
+import { daemonSocketPath, daemonTokenPath, requestDaemon } from '../daemon/lifecycle.js'
 
 /**
  * CLI entry point for `lazyhub serve`.
@@ -28,7 +28,7 @@ export async function runServe(argv = []) {
 
   if (argv.includes('--stop')) {
     try {
-      await requestDaemon(socketPath, { type: 'stop' })
+      await requestDaemon(socketPath, { type: 'stop' }, 1000, { tokenPath: daemonTokenPath(config) })
       process.stdout.write(json ? `${JSON.stringify({ ok: true })}\n` : 'lazyhub daemon stopped\n')
       return 0
     } catch (err) {

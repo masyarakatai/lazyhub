@@ -2,37 +2,51 @@ import { createServer } from 'net'
 import { writeFileSync, unlinkSync, chmodSync, mkdirSync } from 'fs'
 import { dirname } from 'path'
 import { runGh } from '../executor/core.js'
-import { daemonPidPath, daemonSocketPath, ensureSocketDir, removeStaleSocket } from './lifecycle.js'
+import {
+  daemonPidPath, daemonSocketPath, daemonTokenPath, ensureSocketDir, removeStaleSocket,
+} from './lifecycle.js'
 import { DaemonCache } from './cache.js'
 import { EventBus } from './event-bus.js'
-import { isGhMutation, writeAuditEntry } from './audit.js'
+import {
+  DEFAULT_TTL_MS, ERR, MAX_MESSAGE_BYTES, MAX_TTL_MS, PRIVILEGED_TYPES, PROTOCOL_VERSION,
+  ProtocolError, buildReadArgs, checkSession, issueSession, unsafeDaemonEnv,
+} from './protocol.js'
 
-const DEFAULT_TTL = 60_000
+const DEFAULT_HOST = 'github.com'
+const ACCOUNT_TTL_MS = 60_000
 
 function send(socket, payload) {
   try { socket.write(JSON.stringify(payload) + '\n') } catch { /* disconnected */ }
 }
 
-function cacheParts(args, stdin) {
-  return ['daemon-gh', args, stdin || null]
+function deny(socket, id, code, message) {
+  send(socket, { id: id ?? null, ok: false, code, error: message })
 }
 
 /**
  * Start the K-lite daemon in the current process.
  *
  * @param {object} config loaded lazyhub config
+ * @param {NodeJS.ProcessEnv} [env] environment to vet; unsafe inherited variables abort startup
  */
-export function startDaemon(config = {}) {
+export function startDaemon(config = {}, env = process.env) {
+  const unsafe = unsafeDaemonEnv(env)
+  if (unsafe.length > 0) {
+    throw new Error(`refusing to start daemon with inherited environment: ${unsafe.join(', ')}`)
+  }
   const socketPath = daemonSocketPath(config)
   const pidPath = daemonPidPath(config)
+  const tokenPath = daemonTokenPath(config)
   const idleMs = Math.max(1, config.daemon?.idle_timeout_minutes || 30) * 60_000
   const startedAt = Date.now()
   const clients = new Set()
   const bus = new EventBus()
-  const cache = new DaemonCache({ defaultTtl: DEFAULT_TTL })
+  const cache = new DaemonCache({ defaultTtl: DEFAULT_TTL_MS })
   let ghCalls = 0
   let cacheHits = 0
   let idleTimer = null
+  let session = null
+  let account = null
 
   ensureSocketDir(socketPath)
   mkdirSync(dirname(pidPath), { recursive: true, mode: 0o700 })
@@ -50,6 +64,11 @@ export function startDaemon(config = {}) {
       buffer += chunk.toString()
       const lines = buffer.split('\n')
       buffer = lines.pop()
+      if (buffer.length > MAX_MESSAGE_BYTES || lines.some(l => l.length > MAX_MESSAGE_BYTES)) {
+        deny(socket, null, ERR.TOO_LARGE, 'message too large')
+        socket.destroy()
+        return
+      }
       for (const line of lines) {
         if (line.trim()) handleMessage(socket, line.trim())
       }
@@ -64,62 +83,96 @@ export function startDaemon(config = {}) {
     })
   })
 
+  async function resolveIdentity() {
+    if (account && Date.now() - account.ts < ACCOUNT_TTL_MS) return account.login
+    const login = await runGh(['api', 'user', '--jq', '.login'], { skipDaemon: true, json: false })
+    if (typeof login !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9-]*(\[bot\])?$/.test(login)) {
+      throw new ProtocolError(ERR.IDENTITY, 'could not resolve authenticated account')
+    }
+    account = { login, ts: Date.now() }
+    return login
+  }
+
+  async function handleRead(socket, msg) {
+    const args = buildReadArgs(msg.op, msg.params)
+    const ttl = Number.isFinite(msg.ttl) ? Math.min(Math.max(msg.ttl, 0), MAX_TTL_MS) : DEFAULT_TTL_MS
+    const identity = { host: DEFAULT_HOST, account: await resolveIdentity(), repo: msg.params.repo }
+    const key = cache.key([msg.op, msg.params], identity)
+    const cached = cache.get(key, ttl)
+    if (cached) {
+      cacheHits += 1
+      send(socket, { id: msg.id, ok: true, cached: true, source: cached.source, payload: cached.payload })
+      return
+    }
+    ghCalls += 1
+    const payload = await runGh(args, { skipDaemon: true })
+    cache.set(key, payload, { repo: identity.repo, op: msg.op })
+    send(socket, { id: msg.id, ok: true, cached: false, payload })
+  }
+
   async function handleMessage(socket, raw) {
     let msg
-    try { msg = JSON.parse(raw) } catch { return }
-    const id = msg.id
+    try { msg = JSON.parse(raw) } catch { return deny(socket, null, ERR.MALFORMED, 'malformed message') }
+    if (!msg || typeof msg !== 'object' || Array.isArray(msg)) {
+      return deny(socket, null, ERR.MALFORMED, 'malformed message')
+    }
+    const id = typeof msg.id === 'string' || typeof msg.id === 'number' ? msg.id : null
+    if (msg.v !== PROTOCOL_VERSION) return deny(socket, id, ERR.VERSION, 'unsupported protocol version')
+    msg.id = id
 
-    if (msg.type === 'ping' || msg.type === 'status') {
-      send(socket, { id, ok: true, status: status() })
-      return
+    if (PRIVILEGED_TYPES.has(msg.type)) {
+      // Rotate an expired secret in place so a long-lived daemon stays controllable
+      // (`serve --stop` re-reads the token file); revoked sessions never rotate.
+      if (session && !session.revoked && Date.now() > session.expiresAt) session = issueSession(tokenPath)
+      const code = session ? checkSession(session, msg.auth) : ERR.UNAUTHENTICATED
+      if (code) return deny(socket, id, code, 'privileged message denied')
     }
 
-    if (msg.type === 'stop') {
-      send(socket, { id, ok: true })
-      shutdown(0)
-      return
-    }
-
-    if (msg.type === 'subscribe' || msg.type === 'watch') {
-      const event = msg.event || msg.payload?.event || 'pr-state-changed'
-      bus.subscribe(event, socket)
-      send(socket, { id, ok: true, subscribed: event })
-      return
-    }
-
-    if (msg.type === 'invalidate') {
-      const repo = msg.repo || msg.payload?.repo || null
-      cache.invalidate(repo)
-      send(socket, { id, ok: true })
-      bus.publish('cache-invalidated', { repo })
-      return
-    }
-
-    if (msg.type === 'gh') {
-      try {
-        const key = cache.key(cacheParts(msg.args, msg.stdin))
-        const ttl = Number.isFinite(msg.ttl) ? msg.ttl : DEFAULT_TTL
-        const cached = cache.get(key, ttl)
-        if (cached) {
-          cacheHits += 1
-          send(socket, { id, ok: true, cached: true, source: cached.source, payload: cached.payload })
+    try {
+      switch (msg.type) {
+        case 'ping':
+        case 'status':
+          send(socket, { id, ok: true, status: status() })
+          return
+        case 'read':
+          await handleRead(socket, msg)
+          return
+        case 'subscribe':
+        case 'watch': {
+          const event = msg.event || msg.payload?.event || 'pr-state-changed'
+          if (typeof event !== 'string' || event.length > 64) throw new ProtocolError(ERR.BAD_PARAMS, 'invalid event')
+          bus.subscribe(event, socket)
+          send(socket, { id, ok: true, subscribed: event })
           return
         }
-        ghCalls += 1
-        const payload = await runGh(msg.args, { stdin: msg.stdin, json: msg.json, skipDaemon: true })
-        cache.set(key, payload, { repo: msg.repo || null, op: 'daemon-gh' })
-        if (isGhMutation(msg.args)) {
-          writeAuditEntry({ op: 'daemon-gh', repo: msg.repo || null, args: msg.args.slice(0, 4) }, config)
-          bus.publish('mutation', { repo: msg.repo || null, args: msg.args.slice(0, 2) })
+        case 'stop':
+          send(socket, { id, ok: true })
+          shutdown(0)
+          return
+        case 'invalidate': {
+          const repo = msg.repo || msg.payload?.repo || null
+          if (repo !== null && typeof repo !== 'string') throw new ProtocolError(ERR.BAD_PARAMS, 'invalid repo')
+          cache.invalidate(repo)
+          send(socket, { id, ok: true })
+          bus.publish('cache-invalidated', { repo })
+          return
         }
-        send(socket, { id, ok: true, cached: false, payload })
-      } catch (err) {
-        send(socket, { id, error: err?.message || 'gh request failed' })
+        case 'revoke':
+          session.revoked = true
+          try { unlinkSync(tokenPath) } catch { /* ignore */ }
+          send(socket, { id, ok: true })
+          return
+        case 'policy':
+        case 'safe-mode':
+          // Authenticated, but policy and safe-mode controls are not served here yet.
+          throw new ProtocolError(ERR.UNSUPPORTED, `${msg.type} is not supported by this daemon`)
+        default:
+          throw new ProtocolError(ERR.UNKNOWN_TYPE, 'unknown message type')
       }
-      return
+    } catch (err) {
+      if (err instanceof ProtocolError) deny(socket, id, err.code, err.message)
+      else deny(socket, id, ERR.FAILED, 'request failed')
     }
-
-    send(socket, { id, error: `unknown type: ${msg.type}` })
   }
 
   function status() {
@@ -131,6 +184,7 @@ export function startDaemon(config = {}) {
       ghCalls,
       cacheHits,
       protocols: ['ipc', 'mcp', 'gh-cache'],
+      protocolVersion: PROTOCOL_VERSION,
     }
   }
 
@@ -143,6 +197,7 @@ export function startDaemon(config = {}) {
   function cleanup() {
     try { unlinkSync(pidPath) } catch { /* ignore */ }
     try { unlinkSync(socketPath) } catch { /* ignore */ }
+    try { unlinkSync(tokenPath) } catch { /* ignore */ }
   }
 
   function shutdown(code = 0) {
@@ -152,6 +207,7 @@ export function startDaemon(config = {}) {
 
   server.listen(socketPath, () => {
     if (process.platform !== 'win32') chmodSync(socketPath, 0o600)
+    session = issueSession(tokenPath)
     writeFileSync(pidPath, String(process.pid), 'utf8')
     process.stdout.write(JSON.stringify({ ok: true, socketPath, pid: process.pid }) + '\n')
     armIdleShutdown()
