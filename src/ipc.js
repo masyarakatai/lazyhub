@@ -5,9 +5,14 @@
  *
  * Starts a Unix domain socket server at:
  *   $LAZYHUB_SOCKET  (if set)
- *   /tmp/lazyhub-<pid>.sock  (default)
+ *   <private dir>/ipc-<pid>.sock  (default; Windows: random named pipe)
  *
- * Also writes the socket path to ~/.lazyhub-socket so clients can
+ * The private dir is $XDG_RUNTIME_DIR/lazyhub or <tmpdir>/lazyhub-<uid>: it is
+ * created 0700 and verified (real directory, owned by us, not group/world
+ * accessible) before bind; the socket is chmod 0600; pre-existing symlinks or
+ * foreign/non-socket entries at the path are rejected (#253).
+ *
+ * Also writes the socket path to ~/.lazyhub-socket (0600) so clients can
  * discover the most recent instance without knowing the PID.
  *
  * Protocol: newline-delimited JSON (NDJSON)
@@ -44,8 +49,11 @@
 
 import { createServer } from 'net'
 import { join } from 'path'
-import { homedir } from 'os'
-import { writeFileSync, unlinkSync, existsSync } from 'fs'
+import { homedir, tmpdir } from 'os'
+import { randomBytes } from 'crypto'
+import { chmodSync, readFileSync, unlinkSync } from 'fs'
+import { assertPrivateDir, ensurePrivateDir, prepareSocketPath, writePrivateFile } from './secure-fs.js'
+import { logger } from './utils.js'
 import {
   getPRStateForBranch as _defaultGetPRStateForBranch,
   getPRReviewComments as _defaultGetPRReviewComments,
@@ -56,6 +64,7 @@ import {
 const SOCKET_POINTER = join(homedir(), '.lazyhub-socket')
 
 let _server = null
+let _cleanup = null
 let _clients = new Set()
 let _stateGetter = () => ({})
 let _navigateHandler = null
@@ -66,8 +75,50 @@ let _resolveThreadHandler = _defaultResolvePRReviewThread
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+let _defaultPath = null
+
+/** Private per-user directory that holds the default Unix socket. */
+function socketDir() {
+  const base = process.env.XDG_RUNTIME_DIR
+  if (base) return join(base, 'lazyhub')
+  const uid = typeof process.getuid === 'function' ? process.getuid() : 'user'
+  return join(tmpdir(), `lazyhub-${uid}`)
+}
+
 function socketPath() {
-  return process.env.LAZYHUB_SOCKET || `/tmp/lazyhub-${process.pid}.sock`
+  if (process.env.LAZYHUB_SOCKET) return process.env.LAZYHUB_SOCKET
+  if (!_defaultPath) {
+    _defaultPath = process.platform === 'win32'
+      ? `\\\\.\\pipe\\lazyhub-${randomBytes(16).toString('hex')}`
+      : join(socketDir(), `ipc-${process.pid}.sock`)
+  }
+  return _defaultPath
+}
+
+/**
+ * Validate the bind location before listen(). Throws on any ownership,
+ * symlink, type or permission problem; nothing here is best-effort.
+ * @param {string} path
+ * @param {string} path
+ */
+function prepareEndpoint(path) {
+  if (process.platform === 'win32') return
+  if (!process.env.LAZYHUB_SOCKET) {
+    ensurePrivateDir(socketDir())
+    assertPrivateDir(socketDir())
+  }
+  prepareSocketPath(path)
+}
+
+function reportIPCError(err, onError) {
+  logger.error(`ipc: ${err.message}`)
+  if (onError) { try { onError(err) } catch { /* caller bug must not mask the IPC error */ } }
+}
+
+function removeIfPresent(path) {
+  try { unlinkSync(path) } catch (err) {
+    if (err.code !== 'ENOENT') logger.error(`ipc: could not remove ${path}: ${err.message}`)
+  }
 }
 
 function broadcast(event, data) {
@@ -215,9 +266,11 @@ function handleMessage(socket, raw) {
  *                                             defaults to executor.addPRReviewThreadReply
  * @param {Function} [opts.onResolveThread]  - async (threadId) => { ok }
  *                                             defaults to executor.resolvePRReviewThread
- * @returns {string} socket path
+ * @param {Function} [opts.onError]          - called with any bind/chmod/ownership error
+ * @returns {string|null} socket path, or null when the endpoint could not be
+ *                        secured (the error is logged and passed to onError)
  */
-export function startIPC({ getState, onNavigate, onPRForBranch, onReviewComments, onReplyThread, onResolveThread } = {}) {
+export function startIPC({ getState, onNavigate, onPRForBranch, onReviewComments, onReplyThread, onResolveThread, onError } = {}) {
   if (_server) return socketPath()
 
   if (getState)          _stateGetter           = getState
@@ -229,9 +282,13 @@ export function startIPC({ getState, onNavigate, onPRForBranch, onReviewComments
 
   const path = socketPath()
 
-  // Clean up stale socket from a previous crash
-  if (existsSync(path)) {
-    try { unlinkSync(path) } catch { /* ignore */ }
+  // Reject squatted/symlinked/foreign paths; remove only our own stale socket.
+  try {
+    prepareEndpoint(path)
+  } catch (err) {
+    reportIPCError(err, onError)
+    process.stderr.write(`lazyhub: IPC disabled: ${err.message}\n`)
+    return null
   }
 
   _server = createServer((socket) => {
@@ -251,12 +308,7 @@ export function startIPC({ getState, onNavigate, onPRForBranch, onReviewComments
     socket.on('error', () => _clients.delete(socket))
   })
 
-  _server.listen(path, () => {
-    // Write pointer file so clients can find us without knowing the PID
-    try { writeFileSync(SOCKET_POINTER, path, 'utf8') } catch { /* ignore */ }
-  })
-
-  _server.on('error', () => { /* ignore EADDRINUSE etc */ })
+  const server = _server
 
   // Cleanup on exit.
   // NOTE: Do NOT call process.exit() here — that is the app's responsibility.
@@ -265,15 +317,62 @@ export function startIPC({ getState, onNavigate, onPRForBranch, onReviewComments
   // handler AND app's persistent handler, causing the second Ctrl+C to have no
   // handler at all (raw mode never restored).  Instead, just clean up the
   // socket files on exit and rely on app.jsx to handle the signal exit.
+  let bound = false // only unlink a socket this process actually bound
   const cleanup = () => {
-    try { unlinkSync(path) } catch { /* ignore */ }
-    try { unlinkSync(SOCKET_POINTER) } catch { /* ignore */ }
+    if (bound && process.platform !== 'win32') removeIfPresent(path)
+    // Only drop the pointer if it still names this instance.
+    if (!bound) return
+    try {
+      if (readFileSync(SOCKET_POINTER, 'utf8') === path) removeIfPresent(SOCKET_POINTER)
+    } catch (err) {
+      if (err.code !== 'ENOENT') logger.error(`ipc: could not read pointer file: ${err.message}`)
+    }
   }
+  _cleanup = cleanup
+
+  const fail = (err) => {
+    reportIPCError(err, onError)
+    server.close()
+    if (_server === server) stopIPC()
+  }
+
+  // EADDRINUSE, EACCES, ... — never swallowed for a privileged endpoint.
+  server.on('error', fail)
+  server.listen(path, () => {
+    bound = true
+    try {
+      if (process.platform !== 'win32') chmodSync(path, 0o600)
+      // Pointer file lets clients find us without knowing the PID.
+      writePrivateFile(SOCKET_POINTER, path)
+    } catch (err) {
+      // Never leave a reachable socket whose mode we could not set.
+      fail(err)
+    }
+  })
+
   process.on('exit',   cleanup)
   process.once('SIGINT',  cleanup)
   process.once('SIGTERM', cleanup)
 
   return path
+}
+
+/**
+ * Stop the IPC server and remove its socket and pointer file.
+ */
+export function stopIPC() {
+  if (!_server) return
+  const cleanup = _cleanup
+  for (const client of _clients) client.destroy()
+  _clients.clear()
+  _server.close()
+  _server = null
+  _cleanup = null
+  _defaultPath = null
+  process.off('exit', cleanup)
+  process.off('SIGINT', cleanup)
+  process.off('SIGTERM', cleanup)
+  cleanup()
 }
 
 /**

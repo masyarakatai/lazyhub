@@ -6,8 +6,10 @@
  * shape alive for older call sites while projecting every value from TOML.
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { readFileSync } from 'fs'
 import { dirname, join } from 'path'
+import { ensurePrivateDir, tightenFile, writePrivateFile } from './secure-fs.js'
+import { logger } from './utils.js'
 import { fileURLToPath } from 'url'
 import { loadConfig as loadTomlConfig, USER_CONFIG_PATH } from './config/loader.js'
 import { DEFAULT_CONFIG } from './config/schema.js'
@@ -191,10 +193,14 @@ export function saveConfig(patch) {
 export function writeDefaultConfig() {
   try {
     readFileSync(CONFIG_PATH, 'utf8')
+    // Migrate files written by older releases with default (world-readable) modes.
+    try { ensurePrivateDir(dirname(CONFIG_PATH)); tightenFile(CONFIG_PATH) } catch (err) {
+      logger.warn('config: could not tighten config permissions', { error: err.message })
+    }
   } catch {
     try {
-      mkdirSync(dirname(CONFIG_PATH), { recursive: true })
-      writeFileSync(CONFIG_PATH, readFileSync(DEFAULT_CONFIG_TOML_PATH, 'utf8'), 'utf8')
+      ensurePrivateDir(dirname(CONFIG_PATH))
+      writePrivateFile(CONFIG_PATH, readFileSync(DEFAULT_CONFIG_TOML_PATH, 'utf8'))
     } catch { /* non-fatal: defaults are bundled and loaded in-memory */ }
   }
 }

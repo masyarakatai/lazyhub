@@ -13,8 +13,9 @@
  * file when saved because lazyhub owns that whole table tree.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { dirname } from 'path'
+import { ensurePrivateDir, writePrivateFile } from '../secure-fs.js'
 import { parse, stringify } from 'smol-toml'
 import { USER_CONFIG_PATH } from './loader.js'
 import { isPlainObject } from './schema.js'
@@ -249,7 +250,7 @@ export function writeConfig(patch, opts = {}) {
     }
   }
 
-  mkdirSync(dirname(configPath), { recursive: true })
-  writeFileSync(configPath, text, 'utf8')
+  ensurePrivateDir(dirname(configPath))
+  writePrivateFile(configPath, text)
   return parseUserConfig(text, configPath)
 }

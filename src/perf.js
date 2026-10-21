@@ -2,9 +2,10 @@
  * perf.js — opt-in local NDJSON performance instrumentation.
  */
 
-import { existsSync, mkdirSync, statSync, appendFileSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, statSync, readFileSync } from 'fs'
 import { homedir } from 'os'
 import { dirname, join } from 'path'
+import { appendPrivateFile, ensurePrivateDir, writePrivateFile } from './secure-fs.js'
 
 const PERF_PATH = process.env.LAZYHUB_PERF_PATH || join(homedir(), '.cache', 'lazyhub', 'perf.ndjson')
 const MAX_BYTES = 10 * 1024 * 1024
@@ -48,13 +49,13 @@ export function recordDuration(type, name, ms) {
 }
 
 function appendPerf(entry) {
-  mkdirSync(dirname(PERF_PATH), { recursive: true })
+  ensurePrivateDir(dirname(PERF_PATH))
   try {
     if (existsSync(PERF_PATH) && statSync(PERF_PATH).size > MAX_BYTES) {
-      writeFileSync(PERF_PATH, '')
+      writePrivateFile(PERF_PATH, '')
     }
   } catch {}
-  appendFileSync(PERF_PATH, `${JSON.stringify(entry)}\n`)
+  appendPrivateFile(PERF_PATH, `${JSON.stringify(entry)}\n`)
 }
 
 /**
