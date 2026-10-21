@@ -155,6 +155,109 @@ export function toTypedRead(args, env = process.env) {
   }
 }
 
+// ─── Operation classification (D8: fail closed) ───────────────────────────────
+// Single source of truth for what runGh() may do with an argv. Only allowlisted
+// reads are 'read'; known state-changing commands are 'write'; everything else
+// (including anything that fails to parse) is 'unknown' and is refused. Only
+// the typed READ_OPS subset is ever cacheable.
+
+/** Read-only gh commands the app issues directly (superset of READ_OPS). */
+const READ_COMMANDS = new Set([
+  'pr list', 'pr view', 'pr diff', 'issue list', 'issue view', 'run list', 'run view',
+  'release list', 'label list', 'gist list', 'gist view', 'repo view',
+])
+/** State-changing gh commands the TUI issues; audited, never cached or retried. */
+const WRITE_COMMANDS = new Set([
+  'pr merge', 'pr close', 'pr ready', 'pr review', 'pr comment', 'pr create', 'pr edit', 'pr checkout',
+  'issue create', 'issue close', 'issue comment', 'issue edit',
+  'run rerun', 'run cancel', 'gist delete',
+])
+const API_BODY_FLAGS = new Set(['-f', '-F', '--field', '--raw-field'])
+const API_VALUE_FLAGS = new Set(['--jq', '-q', '--hostname'])
+const API_BARE_FLAGS = new Set(['--paginate', '--slurp'])
+
+/**
+ * True for a GraphQL document that is a pure query (fail closed on anything odd).
+ *
+ * @param {unknown} doc
+ */
+function isGraphqlQuery(doc) {
+  if (typeof doc !== 'string' || doc.startsWith('@')) return false
+  const text = doc.replace(/#[^\n]*/g, '').trim()
+  return /^(query\b|\{)/.test(text) && !/\b(mutation|subscription)\b/i.test(text)
+}
+
+/**
+ * @param {string[]} args
+ * @returns {'read'|'write'|'unknown'}
+ */
+function classifyApi(args) {
+  let method = null
+  let endpoint = null
+  let input = false
+  let body = false
+  const queries = []
+  for (let i = 1; i < args.length; i += 1) {
+    const a = args[i]
+    if (a === '--method' || a === '-X') {
+      method = args[i += 1]
+      if (typeof method !== 'string') return 'unknown'
+    } else if (a.startsWith('--method=')) method = a.slice('--method='.length)
+    else if (/^-X./.test(a)) method = a.slice(2)
+    else if (API_BODY_FLAGS.has(a)) {
+      const val = args[i += 1]
+      if (typeof val !== 'string') return 'unknown'
+      body = true
+      if (val.startsWith('query=')) queries.push(val.slice('query='.length))
+    } else if (a === '--input' || a.startsWith('--input=')) {
+      input = true
+      if (a === '--input') i += 1
+    } else if (API_VALUE_FLAGS.has(a)) i += 1
+    else if (API_BARE_FLAGS.has(a)) continue
+    else if (a.startsWith('-')) return 'unknown'
+    else if (endpoint === null) endpoint = a
+    else return 'unknown'
+  }
+  if (endpoint === null) return 'unknown'
+  const verb = method === null ? null : method.toUpperCase()
+  if (input) return 'write'
+  if (/graphql/i.test(endpoint)) {
+    const ok = queries.length > 0 && queries.every(isGraphqlQuery)
+    return ok && (verb === null || verb === 'GET' || verb === 'POST') ? 'read' : 'write'
+  }
+  // GET/HEAD is a read; so is no method with no fields (gh defaults to GET).
+  // Any other method, and an implicit POST (fields without a method), is a write.
+  return verb === 'GET' || verb === 'HEAD' || (verb === null && !body) ? 'read' : 'write'
+}
+
+/**
+ * Classify a gh argv. Never throws; any failure classifies as 'unknown'.
+ *
+ * @param {unknown} args
+ * @returns {'read'|'write'|'unknown'}
+ */
+export function classifyGh(args) {
+  try {
+    if (!Array.isArray(args) || args.length === 0 || args.some(a => typeof a !== 'string')) return 'unknown'
+    if (args[0] === 'api') return classifyApi(args)
+    const key = `${args[0]} ${args[1]}`
+    if (READ_COMMANDS.has(key)) return 'read'
+    if (WRITE_COMMANDS.has(key)) return 'write'
+    return 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
+/**
+ * True only for typed read ops, the sole cacheable operations.
+ *
+ * @param {unknown} op
+ */
+export function isCacheableOp(op) {
+  return typeof op === 'string' && Object.hasOwn(READ_OPS, op)
+}
+
 // ─── Authenticated sessions ───────────────────────────────────────────────────
 
 /**

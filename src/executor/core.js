@@ -11,8 +11,9 @@ import { GhError } from './gh-error.js'
 import { recordDuration } from '../perf.js'
 import { invalidateRepoCache } from '../cache.js'
 import { requestDaemon } from '../daemon/lifecycle.js'
-import { toTypedRead } from '../daemon/protocol.js'
-import { isGhMutation, writeAuditEntry } from '../daemon/audit.js'
+import { classifyGh, toTypedRead } from '../daemon/protocol.js'
+import { hashArgs, writeAuditEntry } from '../daemon/audit.js'
+import { randomUUID } from 'crypto'
 
 // Re-exported so `import { GhError } from './executor.js'` keeps working.
 export { GhError }
@@ -34,6 +35,17 @@ function pushGhCall(entry) {
   if (ghCallHistory.length > GH_HISTORY_LIMIT) {
     ghCallHistory.splice(0, ghCallHistory.length - GH_HISTORY_LIMIT)
   }
+}
+
+/**
+ * Args safe to attach to a refusal error (token-length runs redacted).
+ *
+ * @param {unknown} args
+ */
+function redactArgs(args) {
+  return Array.isArray(args)
+    ? args.map(arg => typeof arg === 'string' ? arg.replace(/[a-zA-Z0-9_-]{40,}/g, '[REDACTED]') : arg)
+    : []
 }
 
 function ghOpName(args) {
@@ -76,7 +88,14 @@ export function getGhCallHistory() {
  */
 export async function runGh(args, opts = {}) {
   const { timeout = GH_TIMEOUT, json, stdin, skipDaemon, ttl } = opts
-  const typed = !skipDaemon && process.env.LAZYHUB_DAEMON_SOCKET && stdin === undefined && json !== false
+  // D8: only allowlisted reads may be cached or served by the daemon. Unknown
+  // operations are refused; writes are audited first and never cached, routed
+  // through the daemon, or retried.
+  const kind = classifyGh(args)
+  if (kind === 'unknown') {
+    throw new GhError({ message: 'Operation is not an allowlisted gh command', stderr: '', exitCode: 1, args: redactArgs(args) })
+  }
+  const typed = kind === 'read' && !skipDaemon && process.env.LAZYHUB_DAEMON_SOCKET && stdin === undefined && json !== false
     ? toTypedRead(args)
     : null
   if (typed) {
@@ -88,9 +107,55 @@ export async function runGh(args, opts = {}) {
       }, Math.min(timeout, 5000))
       return response.payload
     } catch {
-      // Fall back to direct gh if the daemon vanished or is stale.
+      // Reads only: fall back to direct gh if the daemon vanished or is stale.
     }
   }
+  if (kind === 'read') return spawnGh(args, opts)
+
+  const reqId = randomUUID()
+  const repo = repoFromArgs(args)
+  try {
+    writeAuditEntry({ phase: 'intent', reqId, op: ghOpName(args), repo, argsHash: hashArgs(args) })
+  } catch {
+    throw new GhError({ message: 'Write blocked: audit log unavailable', stderr: '', exitCode: 1, args: redactArgs(args) })
+  }
+  let outcome = 'error'
+  try {
+    const result = await spawnGh(args, opts)
+    outcome = 'ok'
+    return result
+  } finally {
+    // The remote outcome may be ambiguous on error, so drop cached reads either way.
+    try { invalidateRepoCache(repo) } catch { /* cache is best-effort */ }
+    await invalidateDaemonCache(repo)
+    try { writeAuditEntry({ phase: 'result', reqId, outcome }) } catch { /* write already happened */ }
+  }
+}
+
+/**
+ * Drop the daemon's in-memory cache after a write so daemon-served reads are not
+ * stale. Best-effort: a failure never fails the write, but is logged.
+ *
+ * @param {string|null} repo
+ */
+async function invalidateDaemonCache(repo) {
+  const socket = process.env.LAZYHUB_DAEMON_SOCKET
+  if (!socket) return
+  try {
+    await requestDaemon(socket, { type: 'invalidate', repo }, 2000, { tokenPath: process.env.LAZYHUB_DAEMON_TOKEN_FILE })
+  } catch (err) {
+    // Surfaces in the gh call history (debug export); the write itself already happened.
+    pushGhCall({ args: ['daemon', 'invalidate'], durationMs: 0, exitCode: 1, error: `daemon cache invalidate failed: ${err.message}` })
+  }
+}
+
+/**
+ * Spawn gh once (no retry) and parse its output. Callers classify first.
+ *
+ * @param {string[]} args
+ * @param {{timeout?: number, json?: boolean, stdin?: string}} [opts]
+ */
+async function spawnGh(args, { timeout = GH_TIMEOUT, json, stdin } = {}) {
   const started = Date.now()
   // GH_HOST / GH_TOKEN are inherited by the child process from process.env
   // (we pass no curated env here — see ARCHITECT_DECISIONS invariant 4, which
@@ -176,12 +241,6 @@ export async function runGh(args, opts = {}) {
     exitCode: 0,
   })
   recordDuration('gh', ghOpName(args), Date.now() - started)
-  if (isGhMutation(args)) {
-    const repo = repoFromArgs(args)
-    invalidateRepoCache(repo)
-    writeAuditEntry({ op: ghOpName(args), repo, args: args.slice(0, 4) })
-  }
-
   const stdout = result.stdout?.trim()
   if (!stdout) return null
 

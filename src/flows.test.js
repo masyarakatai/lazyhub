@@ -910,7 +910,7 @@ describe('Error handling flows', () => {
   it('redacts long tokens in error args', async () => {
     fail('bad credentials')
     try {
-      await runGh(['api', 'repos/owner/repo', '--header', 'Authorization: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'])
+      await runGh(['api', 'repos/owner/repo', '--jq', 'ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'])
     } catch (err) {
       expect(err.args.join(' ')).not.toContain('ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890')
     }
