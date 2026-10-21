@@ -121,6 +121,17 @@ export function requestDaemon(socketPath, message, timeoutMs = 1000, opts = {}) 
 }
 
 /**
+ * Publish the endpoint (and the path of its session secret, not the secret) to this process.
+ *
+ * @param {string} socketPath
+ * @param {object} config
+ */
+function exposeDaemon(socketPath, config) {
+  process.env.LAZYHUB_DAEMON_SOCKET = socketPath
+  process.env.LAZYHUB_DAEMON_TOKEN_FILE = daemonTokenPath(config)
+}
+
+/**
  * Ensure a daemon is reachable, spawning one detached when needed.
  *
  * @param {object} config
@@ -132,7 +143,7 @@ export async function ensureDaemon(config = {}, entrypoint) {
   const socketPath = daemonSocketPath(config)
   try {
     await requestDaemon(socketPath, { type: 'status' }, 150)
-    process.env.LAZYHUB_DAEMON_SOCKET = socketPath
+    exposeDaemon(socketPath, config)
     return socketPath
   } catch {
     // Spawn below, unless the caller is not a trusted interactive session.
@@ -148,7 +159,7 @@ export async function ensureDaemon(config = {}, entrypoint) {
     await new Promise(resolve => setTimeout(resolve, 50))
     try {
       await requestDaemon(socketPath, { type: 'status' }, 150)
-      process.env.LAZYHUB_DAEMON_SOCKET = socketPath
+      exposeDaemon(socketPath, config)
       return socketPath
     } catch {
       // Keep waiting until the short startup window expires.

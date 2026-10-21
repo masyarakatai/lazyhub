@@ -127,7 +127,25 @@ export async function runGh(args, opts = {}) {
   } finally {
     // The remote outcome may be ambiguous on error, so drop cached reads either way.
     try { invalidateRepoCache(repo) } catch { /* cache is best-effort */ }
+    await invalidateDaemonCache(repo)
     try { writeAuditEntry({ phase: 'result', reqId, outcome }) } catch { /* write already happened */ }
+  }
+}
+
+/**
+ * Drop the daemon's in-memory cache after a write so daemon-served reads are not
+ * stale. Best-effort: a failure never fails the write, but is logged.
+ *
+ * @param {string|null} repo
+ */
+async function invalidateDaemonCache(repo) {
+  const socket = process.env.LAZYHUB_DAEMON_SOCKET
+  if (!socket) return
+  try {
+    await requestDaemon(socket, { type: 'invalidate', repo }, 2000, { tokenPath: process.env.LAZYHUB_DAEMON_TOKEN_FILE })
+  } catch (err) {
+    // Surfaces in the gh call history (debug export); the write itself already happened.
+    pushGhCall({ args: ['daemon', 'invalidate'], durationMs: 0, exitCode: 1, error: `daemon cache invalidate failed: ${err.message}` })
   }
 }
 

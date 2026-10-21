@@ -9,7 +9,7 @@ import { execa } from 'execa'
 import { requestDaemon } from '../daemon/lifecycle.js'
 import { writeAuditEntry } from '../daemon/audit.js'
 import { invalidateRepoCache } from '../cache.js'
-import { runGh, GhError } from './core.js'
+import { runGh, GhError, getGhCallHistory } from './core.js'
 
 const ok = (stdout = '[]') => ({ exitCode: 0, stdout, stderr: '' })
 const WRITE = ['pr', 'merge', '7', '--repo', 'o/r']
@@ -43,16 +43,29 @@ describe('runGh fail-closed write handling', () => {
     expect(invalidateRepoCache).toHaveBeenCalledWith('o/r')
   })
 
+  it('tells the daemon to drop its cache after a write, authenticated; a failure is logged, not thrown', async () => {
+    process.env.LAZYHUB_DAEMON_TOKEN_FILE = '/nonexistent/daemon.token'
+    requestDaemon.mockResolvedValueOnce({ ok: true })
+    await runGh(WRITE)
+    expect(requestDaemon).toHaveBeenCalledWith(
+      '/nonexistent/daemon.sock', { type: 'invalidate', repo: 'o/r' }, 2000, { tokenPath: '/nonexistent/daemon.token' },
+    )
+    requestDaemon.mockRejectedValueOnce(new Error('denied'))
+    await expect(runGh(WRITE)).resolves.toEqual([])
+    expect(getGhCallHistory().at(-1).error).toMatch(/invalidate failed: denied/)
+    delete process.env.LAZYHUB_DAEMON_TOKEN_FILE
+  })
+
   it('does not audit reads, so an unavailable audit log never blocks them', async () => {
     writeAuditEntry.mockImplementation(() => { throw new Error('disk full') })
     await expect(runGh(['pr', 'list', '--repo', 'o/r'])).resolves.toEqual([])
     expect(writeAuditEntry).not.toHaveBeenCalled()
   })
 
-  it('never routes a write through the daemon or retries it after daemon loss or failure', async () => {
+  it('never sends a write to the daemon as a read or retries it after daemon loss or failure', async () => {
     execa.mockResolvedValue({ exitCode: 1, stdout: '', stderr: 'boom' })
     await expect(runGh(WRITE)).rejects.toBeInstanceOf(GhError)
-    expect(requestDaemon).not.toHaveBeenCalled()
+    expect(requestDaemon.mock.calls.filter(c => c[1].type === 'read')).toEqual([])
     expect(execa).toHaveBeenCalledTimes(1)
     expect(writeAuditEntry.mock.calls[1][0].outcome).toBe('error')
   })
