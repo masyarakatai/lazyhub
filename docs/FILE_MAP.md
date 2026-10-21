@@ -180,13 +180,14 @@
 | `src/daemon/cache.js` | Read-through cache used by the daemon for gh results. @property {Map<string, {ts:number, payload:unknown}>} memory |
 | `src/daemon/event-bus.js` | Small in-daemon event bus for IPC/MCP/TUI subscribers. @property {Map<string, Set<{write:Function}>>} subscribers |
 | `src/daemon/lifecycle.js` | Resolve the daemon endpoint. Unix uses a filesystem socket; Windows uses a named pipe so the rest of the daemon can stay on Node's `net` module. @param {object} config |
-| `src/daemon/mcp-adapter.js` | Execute one MCP tool by name. @param {string} name @param {object} args |
+| `src/daemon/mcp-adapter.js` | Runtime-validate tool arguments. Fails closed with stable error codes. Only fields validated here are ever read; client-supplied scope/identity metadata is ignored and never confers authority. @param {string} canonical @param {object} args |
 | `src/daemon/server.js` | Start the K-lite daemon in the current process. @param {object} config loaded lazyhub config |
 | `src/debug-state.js` | Build the redacted debug-state object. @param {object} appState optional app-level state snapshot @returns {object} serializable debug-state payload |
 | `src/features/tabs/filter-to-gh.js` | translate TOML pane filters to executor args. |
 | `src/features/tabs/pane.jsx` | one TOML-declared dashboard pane. |
 | `src/features/tabs/registry.js` | TOML custom tab registry. |
 | `src/features/tabs/view.jsx` | TOML-declared multi-pane dashboard. |
+| `src/input-validation.js` | shared runtime validators for untrusted agent/model-supplied input (MCP adapter, AI assistant). Dependency-free so the daemon can import it without pulling in UI code. |
 | `src/perf.js` | opt-in local NDJSON performance instrumentation. |
 | `src/test/test-helpers.jsx` | (no header — inferred: test-helpers) |
 
@@ -209,5 +210,5 @@ Test file counts by directory:
 | `src/theme/` | 1 |
 | `src/ui/` | 2 |
 
-**Total non-test source files:** 121
+**Total non-test source files:** 122
 **Total test files:** 42

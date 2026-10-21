@@ -9,6 +9,7 @@
  * Direct fetch pattern (same as ai.js). No SDK dependency.
  */
 
+import { isRepoSlug, isPositiveId } from './input-validation.js'
 import {
   listPRs, getPR, getPRDiff, getPRChecks, listIssues, getIssue,
   listBranches, listRuns, getRepoInfo, listNotifications, listPRComments,
@@ -394,6 +395,52 @@ async function callReadOnlyTool(toolName, toolInput, repo) {
 
 // ─── Mutating tool executor (called by UI after confirmation) ─────────────────
 
+const MAX_TEXT_LENGTH = 65536
+const REVIEW_EVENTS = ['approve', 'request-changes', 'comment']
+
+function invalid(code, message) {
+  return Object.assign(new Error(message), { code })
+}
+
+/**
+ * Runtime-validate model-supplied mutation input before dispatch. Fails closed
+ * with stable error codes; model output is untrusted.
+ * @param {string} toolName
+ * @param {object} input
+ * @param {string} repo
+ */
+function validateMutationInput(toolName, input, repo) {
+  if (!MUTATING_TOOLS.has(toolName)) throw invalid('AI_UNKNOWN_TOOL', `Unknown mutating tool: ${toolName}`)
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    throw invalid('AI_INVALID_INPUT', 'Tool input must be an object')
+  }
+  if (!isRepoSlug(repo)) throw invalid('AI_INVALID_REPO', 'repo must be in owner/name form')
+  if (toolName === 'rerun_run' || toolName === 'cancel_run') {
+    if (!isPositiveId(input.runId)) throw invalid('AI_INVALID_ID', 'runId must be a positive integer')
+  } else if (!isPositiveId(input.number)) {
+    throw invalid('AI_INVALID_ID', 'number must be a positive integer')
+  }
+  for (const field of ['body', 'message']) {
+    const v = input[field]
+    if (v !== undefined && (typeof v !== 'string' || v.length > MAX_TEXT_LENGTH)) {
+      throw invalid('AI_INVALID_TEXT', `${field} must be a string of at most ${MAX_TEXT_LENGTH} characters`)
+    }
+  }
+  if (toolName === 'add_labels') {
+    // Issue/PR confusion: the resource type is an enum, never free-form.
+    if (input.type !== undefined && !['pr', 'issue'].includes(input.type)) {
+      throw invalid('AI_INVALID_RESOURCE_TYPE', 'type must be "pr" or "issue"')
+    }
+    if (!Array.isArray(input.labels) || input.labels.length === 0 || input.labels.length > 50 ||
+        input.labels.some(l => typeof l !== 'string' || !l || l.length > 100)) {
+      throw invalid('AI_INVALID_LABELS', 'labels must be 1-50 non-empty strings')
+    }
+  }
+  if (toolName === 'review_pr' && !REVIEW_EVENTS.includes(input.event)) {
+    throw invalid('AI_INVALID_ENUM', `event must be one of ${REVIEW_EVENTS.join(', ')}`)
+  }
+}
+
 /**
  * Execute a mutating tool after user confirmation.
  * @param {string} toolName
@@ -401,6 +448,7 @@ async function callReadOnlyTool(toolName, toolInput, repo) {
  * @param {string} repo
  */
 export async function executeMutatingTool(toolName, toolInput, repo) {
+  validateMutationInput(toolName, toolInput, repo)
   switch (toolName) {
     case 'merge_pr': {
       const strategy = toolInput.strategy || 'merge'

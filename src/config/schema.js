@@ -231,7 +231,7 @@ export const DEFAULT_CONFIG = {
   agent: {
     auto_spawn_daemon: true,
     mcp_auto_register: false,
-    default_scope: 'full',
+    default_scope: 'read-only',
     require_confirm: false,
     audit_log_path: '~/.config/lazyhub/audit.log',
   },
@@ -806,6 +806,9 @@ export function validateConfig(raw) {
       case 'state':    set('state',    validateState(val, warnings)); break
       default:         warnings.push(`unknown config section [${key}] — ignored`)
     }
+  }
+  if (out.agent?.default_scope !== undefined && out.agent.default_scope !== 'read-only') {
+    warnings.push(`[agent].default_scope "${out.agent.default_scope}" does not grant agent write authority — agent mutations stay disabled (effective scope: read-only)`)
   }
   const selectedAiProvider = out.defaults?.ai_provider || out.ai?.provider
   if (selectedAiProvider === 'openai-compatible') {

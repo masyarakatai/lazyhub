@@ -258,3 +258,15 @@ describe('isPlainObject', () => {
     expect(isPlainObject('x')).toBe(false)
   })
 })
+
+describe('agent default scope', () => {
+  it('defaults to read-only', () => {
+    expect(DEFAULT_CONFIG.agent.default_scope).toBe('read-only')
+  })
+
+  it('warns that a broader configured scope does not gain agent write authority', () => {
+    const { config, warnings } = validateConfig({ agent: { default_scope: 'full' } })
+    expect(config.agent.default_scope).toBe('full')
+    expect(warnings.some(w => w.includes('agent mutations stay disabled'))).toBe(true)
+  })
+})

@@ -54,4 +54,35 @@ describe('daemon MCP adapter', () => {
       })).rejects.toThrow(MCP_MUTATIONS_DISABLED)
     }
   )
+
+  it('ignores client-supplied scope metadata when resolving authority', async () => {
+    const { MCP_MUTATIONS_DISABLED, callTool } = await import('./mcp-adapter.js')
+    await expect(callTool('merge_pr', {
+      repo: 'owner/repo',
+      number: 1,
+      scope: 'full',
+      _meta: { agent: 'trusted', scope: 'full' },
+    })).rejects.toMatchObject({ code: 'MCP_MUTATIONS_DISABLED', message: MCP_MUTATIONS_DISABLED })
+  })
+
+  it.each([
+    ['get_pr', { repo: 'owner/repo', number: '1' }, 'MCP_INVALID_NUMBER'],
+    ['get_pr', { repo: 'owner/repo', number: -3 }, 'MCP_INVALID_NUMBER'],
+    ['get_pr', { repo: 'owner/repo', number: 1.5 }, 'MCP_INVALID_NUMBER'],
+    ['get_issue', { repo: 'owner/repo' }, 'MCP_INVALID_NUMBER'],
+    ['get_pr', { repo: 'not a repo', number: 1 }, 'MCP_INVALID_REPO'],
+    ['get_pr', { repo: ['owner/repo'], number: 1 }, 'MCP_INVALID_REPO'],
+    ['list_prs', { repo: 'owner/repo', state: 'bogus' }, 'MCP_INVALID_STATE'],
+    ['list_issues', { repo: 'owner/repo', state: 'merged' }, 'MCP_INVALID_STATE'],
+    ['list_prs', { repo: 'owner/repo', limit: 100000 }, 'MCP_INVALID_LIMIT'],
+    ['query', { query: 'x'.repeat(2001) }, 'MCP_INVALID_TEXT'],
+    ['get_issue', { repo: 'owner/repo', number: 1, resource_type: 'pr' }, 'MCP_RESOURCE_MISMATCH'],
+    ['get_pr', { repo: 'owner/repo', number: 1, resource_type: 'issue' }, 'MCP_RESOURCE_MISMATCH'],
+    ['no_such_tool', {}, 'MCP_UNKNOWN_TOOL'],
+    [undefined, {}, 'MCP_INVALID_TOOL'],
+    ['list_prs', null, 'MCP_INVALID_ARGUMENTS'],
+  ])('fails closed on malformed call %s %j with %s', async (name, args, code) => {
+    const { callTool } = await import('./mcp-adapter.js')
+    await expect(callTool(name, args)).rejects.toMatchObject({ code })
+  })
 })
