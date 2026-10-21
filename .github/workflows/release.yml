@@ -5,45 +5,85 @@ name: Release
 #   2. git push && git push --tags
 # This publishes to the npm "next" dist-tag. Promote to "latest" separately
 # with promote.yml after the soak window.
+#
+# npm auth is OIDC trusted publishing (no NPM_TOKEN / NODE_AUTH_TOKEN). The
+# trusted publisher on npmjs.com is bound to this exact filename (release.yml)
+# and the `npm-publish` environment. See docs/RELEASING.md.
 
 on:
   push:
     tags: ['v*']
 
+permissions: {}
+
 jobs:
-  release:
-    name: Release
+  publish:
+    name: Publish to npm (next)
     runs-on: ubuntu-latest
+    environment: npm-publish
     permissions:
-      contents: write
+      contents: read
+      id-token: write # npm OIDC trusted publishing + provenance
     steps:
       - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-          registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing requires npm CLI >= 11.5.1 (Node 22 bundles npm 10).
+      - name: Install npm with trusted-publishing support
+        run: npm install -g npm@^11.5.1
+
+      - name: Verify tag matches package.json version
+        run: |
+          PKG="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$PKG" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $PKG"
+            exit 1
+          fi
 
       - run: npm ci
 
       - name: Build
         run: npm run build
 
-      - name: Verify NPM_TOKEN is present
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::error::NPM_TOKEN secret is not set — cannot publish. Add it at Settings → Secrets → Actions."
-            exit 1
-          fi
-
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --tag next
+        run: npm publish --access public --tag next --provenance
+
+  smoke:
+    name: Post-publish smoke test
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install npm with signature/attestation verification
+        run: npm install -g npm@^11.5.1
+
+      - name: Verify published tarball
+        run: |
+          # Registry propagation can lag the publish by a short while.
+          for i in $(seq 1 12); do
+            npm view "lazyhub@${GITHUB_REF_NAME#v}" version >/dev/null 2>&1 && break
+            echo "waiting for registry ($i/12)"; sleep 10
+          done
+          node scripts/release-smoke.mjs "${GITHUB_REF_NAME#v}"
+
+  github-release:
+    name: Create GitHub Release
+    needs: [publish, smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
 
       - name: Create GitHub Release
         env:

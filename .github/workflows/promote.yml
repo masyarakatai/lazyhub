@@ -12,20 +12,30 @@ on:
         required: true
         type: string
 
+# npm auth is OIDC trusted publishing (no NPM_TOKEN). The trusted publisher for
+# promote.yml must have the `npm dist-tag` permission enabled and be bound to
+# the `npm-publish` environment. See docs/RELEASING.md.
+permissions: {}
+
 jobs:
   promote:
     name: Promote npm next to latest
     runs-on: ubuntu-latest
+    environment: npm-publish
     permissions:
-      contents: write
+      contents: read
+      id-token: write # npm OIDC trusted publishing (dist-tag)
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-          registry-url: 'https://registry.npmjs.org'
           cache: npm
+
+      # dist-tag over OIDC requires npm >= 11.21.0 (or >= 12.2.0).
+      - name: Install npm with OIDC dist-tag support
+        run: npm install -g npm@^11.21.0
 
       - name: Confirm version input
         run: |
@@ -57,7 +67,6 @@ jobs:
 
       - name: Promote npm dist-tag
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           VERSION: ${{ inputs.version }}
         run: npm dist-tag add "lazyhub@${VERSION}" latest
 
